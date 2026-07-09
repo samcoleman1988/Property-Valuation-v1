@@ -1,7 +1,19 @@
 """Transport and location assessment.
 
 Calculates distances and commute indicators using free geocoding.
-Includes fixed reference points for user contexts.
+
+The report is generic by default — it does not embed any individual's
+personal locations. Distance-to-destination checks only run if the
+caller explicitly supplies `personal_destinations` (see app.py's
+"Personal Destinations" sidebar setting, off by default).
+
+There is no generic amenity data source wired up (no free API for
+schools/supermarkets/transport-links is integrated), and none is
+fabricated to fill the gap. Without personal destinations, this module
+does not produce a location_score at all — `assessed` stays False and
+`location_score` stays None, so a caller can never mistake "nothing was
+assessed" for "assessed as average" (a numeric placeholder like 5/10
+would look exactly like a real, if mediocre, score).
 """
 
 from dataclasses import dataclass, field, asdict
@@ -12,27 +24,27 @@ from geopy.distance import geodesic
 
 from .utils import cache_key, get_cached, set_cache
 
-# User reference locations
-REFERENCE_LOCATIONS = {
-    "OX33 1RT": {"name": "Home (OX33 1RT)", "lat": 51.7656, "lon": -1.1384},
-    "John Radcliffe Hospital": {"name": "John Radcliffe Hospital, Oxford", "lat": 51.7637, "lon": -1.2200},
-}
-
 
 @dataclass
 class LocationAssessment:
-    # Distance to reference points
+    # Distance to any personally-configured destinations (opt-in only —
+    # empty unless the user has added destinations in Settings). This is
+    # personal-convenience scoring, not a generic investment metric.
     distances: list = field(default_factory=list)  # [{name, distance_miles, drive_time_est}]
 
     # Station access
     nearest_stations: list = field(default_factory=list)
     station_distance_miles: float = 0.0
 
-    # General
-    location_score: int = 0  # 0-10
+    # General — assessed is True only when personal destinations were
+    # actually scored. location_score is None (never a fabricated
+    # number) whenever assessed is False.
+    assessed: bool = False
+    location_score: Optional[int] = None  # 0-10, only meaningful when assessed
     resale_demand: str = ""
     notes: str = ""
     warnings: list = field(default_factory=list)
+    data_gaps: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -42,8 +54,16 @@ def assess_location(
     postcode: str,
     latitude: float = 0.0,
     longitude: float = 0.0,
+    personal_destinations: Optional[list] = None,
 ) -> LocationAssessment:
-    """Assess location quality and commute distances."""
+    """Assess location — distances to any user-configured destinations,
+    plus a neutral placeholder score when none are configured.
+
+    personal_destinations: optional list of {"name": str, "postcode": str}
+    dicts. None/empty by default — the report stays generic unless the
+    user has explicitly added destinations (Settings sidebar, Personal
+    Purchase / Both modes only).
+    """
     assessment = LocationAssessment()
 
     if not latitude or not longitude:
@@ -54,14 +74,21 @@ def assess_location(
             assessment.warnings.append("Could not geocode property — distance checks unavailable")
             return assessment
 
-    # Calculate distances to reference locations
+    # Calculate distances to any personally-configured destinations
     property_coords = (latitude, longitude)
-    for ref_key, ref in REFERENCE_LOCATIONS.items():
-        ref_coords = (ref["lat"], ref["lon"])
-        dist = geodesic(property_coords, ref_coords).miles
+    for dest in (personal_destinations or []):
+        dest_coords = None
+        if dest.get("lat") and dest.get("lon"):
+            dest_coords = (dest["lat"], dest["lon"])
+        elif dest.get("postcode"):
+            dest_coords = geocode_postcode(dest["postcode"])
+        if not dest_coords:
+            assessment.warnings.append(f"Could not geocode destination '{dest.get('name', '?')}'")
+            continue
+        dist = geodesic(property_coords, dest_coords).miles
         drive_est = _estimate_drive_time(dist)
         assessment.distances.append({
-            "name": ref["name"],
+            "name": dest.get("name") or dest.get("postcode", "Destination"),
             "distance_miles": round(dist, 1),
             "drive_time_estimate": drive_est,
         })
@@ -107,16 +134,36 @@ def _estimate_drive_time(distance_miles: float) -> str:
 
 
 def _find_nearest_stations(assessment: LocationAssessment, lat: float, lon: float):
-    """Find nearest railway stations — uses a simple approach via postcodes.io."""
-    assessment.warnings.append(
-        "Station distance is estimated. Check National Rail for actual journey times."
+    """Nearest-station lookup is not yet implemented — no free station
+    dataset is wired up. Flagged as a data gap rather than a fabricated
+    estimate; see README Known Limitations.
+    """
+    assessment.data_gaps.append(
+        "Nearest railway station distance is not calculated automatically — "
+        "check National Rail or a map service directly."
     )
 
 
 def _score_location(assessment: LocationAssessment):
-    """Score overall location quality."""
-    score = 5  # baseline
+    """Score location quality against personally-configured destinations.
 
+    Without them, there is no generic amenity data source wired up (no
+    free API for schools, supermarkets, or transport links is
+    integrated) — assessed stays False and location_score stays None.
+    No placeholder number is produced; see the module docstring for why.
+    """
+    if not assessment.distances:
+        assessment.assessed = False
+        assessment.location_score = None
+        assessment.data_gaps.append(
+            "Generic location scoring is not currently available. Add personal "
+            "destinations in Personal Purchase mode if commute/access scoring "
+            "is required."
+        )
+        return
+
+    assessment.assessed = True
+    score = 5  # baseline
     for d in assessment.distances:
         dist = d.get("distance_miles", 999)
         if dist < 5:

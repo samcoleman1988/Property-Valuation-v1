@@ -287,7 +287,8 @@ def _assess_evidence_sufficiency(result: ValuationResult, evidence: ComparableEv
             )
         if evidence.total_excluded > 0:
             result.confidence_drivers.append(
-                f"{evidence.total_excluded} comparables excluded by hard gates (wrong type, new build, etc)."
+                f"{evidence.total_excluded} nearby sales were screened but excluded as not "
+                f"sufficiently comparable (different property type, new-build status, etc)."
             )
         result.recommendation = build_recommendation(
             fair_value_balanced=0, fair_value_conservative=0, asking_price=result.asking_price,
@@ -1047,9 +1048,9 @@ def _identify_data_gaps(
         )
     if evidence.total_excluded > 5:
         result.data_gaps.append(
-            f"{evidence.total_excluded} comparables were excluded by hard gates "
-            f"(incompatible type, new build, etc). This may indicate the area has "
-            f"mixed housing stock."
+            f"{evidence.total_excluded} nearby sales were screened but excluded as not "
+            f"sufficiently comparable (incompatible property type, new-build status, etc). "
+            f"This may indicate the area has mixed housing stock."
         )
     if not result.spread_acceptable:
         result.data_gaps.append(

@@ -133,19 +133,6 @@ class RiskPenalties:
 
 
 @dataclass(frozen=True)
-class ReferenceLocations:
-    """Fixed reference points for distance calculations."""
-    home: dict = field(default_factory=lambda: {
-        "name": "Home (OX33 1RT)",
-        "lat": 51.7656, "lon": -1.1384,
-    })
-    work: dict = field(default_factory=lambda: {
-        "name": "John Radcliffe Hospital",
-        "lat": 51.7637, "lon": -1.2200,
-    })
-
-
-@dataclass(frozen=True)
 class HPIDefaults:
     """House Price Index fallback assumptions."""
     national_annual_growth_pct: float = 3.0
@@ -163,7 +150,6 @@ class Config:
     scorecard_weights: ScorecardWeights = field(default_factory=ScorecardWeights)
     build_costs: BuildCosts = field(default_factory=BuildCosts)
     risk_penalties: RiskPenalties = field(default_factory=RiskPenalties)
-    reference_locations: ReferenceLocations = field(default_factory=ReferenceLocations)
     hpi: HPIDefaults = field(default_factory=HPIDefaults)
 
 

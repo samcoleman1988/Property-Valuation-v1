@@ -522,10 +522,21 @@ def generate_report(
 
     # === Location ===
     pdf.section_title(f"{next_sec()}. Location & Commute")
-    pdf.kv("Location Score", f"{location.get('location_score', 0)}/10")
-    for d in location.get("distances", []):
-        pdf.kv(d.get("name", ""),
-               f"{d.get('distance_miles', 0)} miles ({d.get('drive_time_estimate', '')})")
+    location_distances = location.get("distances", [])
+    if location.get("assessed") and location_distances:
+        pdf.body("Personal destination scoring — not part of the generic investment valuation.")
+        pdf.kv("Personal Location Score", f"{location.get('location_score', 0)}/10")
+        for d in location_distances:
+            pdf.kv(d.get("name", ""),
+                   f"{d.get('distance_miles', 0)} miles ({d.get('drive_time_estimate', '')})")
+    else:
+        pdf.kv("Location Assessment", "Not assessed")
+        pdf.body(
+            "Generic location scoring is not currently available. Add personal "
+            "destinations in Personal Purchase mode if commute/access scoring is required."
+        )
+    for gap in location.get("data_gaps", []):
+        pdf.body(gap)
     for w in location.get("warnings", []):
         pdf.warn(w)
 

@@ -88,22 +88,22 @@ def _classify_gap(gap_pct: float) -> str:
 
 
 _NEGOTIATION_STANCE = {
-    "Insufficient evidence": "Cannot assess — insufficient evidence",
-    "Weak evidence": "Verify manually before negotiating",
-    "Undervalued": "Act quickly",
-    "Slightly undervalued": "Move promptly, still negotiate",
-    "Fairly priced": "Open negotiations",
-    "Slightly above fair value": "Negotiate carefully",
-    "Overpriced": "Negotiate hard or walk away",
+    "Insufficient evidence": "Insufficient evidence to advise on negotiation.",
+    "Weak evidence": "Evidence is limited; confirm value independently before negotiating.",
+    "Undervalued": "Little room to negotiate further below the asking price.",
+    "Slightly undervalued": "Some room to negotiate below the asking price.",
+    "Fairly priced": "Standard negotiation applies.",
+    "Slightly above fair value": "Room to negotiate below the asking price.",
+    "Overpriced": "Significant room to negotiate below the asking price.",
 }
 
 
 _TAGLINES = {
-    "Undervalued": "Undervalued - investigate quickly",
-    "Slightly undervalued": "Slightly undervalued - promising",
-    "Fairly priced": "Fairly priced - negotiate for margin",
-    "Slightly above fair value": "Slightly above fair value - negotiate carefully",
-    "Overpriced": "Overpriced - negotiate hard or walk away",
+    "Undervalued": "Priced below the evidence-supported range",
+    "Slightly undervalued": "Priced modestly below the evidence-supported range",
+    "Fairly priced": "Priced in line with the evidence-supported range",
+    "Slightly above fair value": "Priced modestly above the evidence-supported range",
+    "Overpriced": "Priced above the evidence-supported range",
 }
 
 
@@ -119,10 +119,10 @@ def _weak_evidence_tagline(gap_pct: float) -> str:
     over, since collapsing it would silently change behaviour at gap==-10).
     """
     if gap_pct > _OVERPRICED_THRESHOLD:
-        return "Tentative: Possibly overpriced but evidence is weak - verify manually"
+        return "Evidence is limited; asking price appears above the indicative range"
     if gap_pct < _UNDERVALUED_THRESHOLD:
-        return "Tentative: Possibly undervalued but evidence is weak - verify manually"
-    return "Tentative: Weak evidence - treat valuation as rough guide only"
+        return "Evidence is limited; asking price appears below the indicative range"
+    return "Evidence is limited; treat this valuation as indicative only"
 
 
 def build_recommendation(
@@ -152,9 +152,12 @@ def build_recommendation(
     # --- No usable fair value at all ---
     if fair_value_balanced <= 0 or valuation_status == "Insufficient evidence":
         rec.pricing_classification = "Insufficient evidence"
-        rec.investment_tagline = "Insufficient evidence - manual research required"
+        rec.investment_tagline = "Insufficient comparable evidence for a reliable opinion of value"
         rec.negotiation_stance = _NEGOTIATION_STANCE["Insufficient evidence"]
-        rec.offer_reasoning = "Insufficient evidence to recommend an offer strategy."
+        rec.offer_reasoning = (
+            "The available evidence is insufficient to recommend an offer strategy. "
+            "Further comparable research is required."
+        )
         return rec
 
     weak_evidence = valuation_status == "Weak evidence"
@@ -179,8 +182,8 @@ def build_recommendation(
     # exactly matching V1's prior gating condition. ---
     if valuation_status not in _OFFER_ELIGIBLE_STATUSES:
         rec.offer_reasoning = (
-            f"Evidence quality ({valuation_status}) is not yet strong enough "
-            f"for a numeric offer strategy — treat the tagline as directional only."
+            f"Evidence quality ({valuation_status}) does not support a numeric offer "
+            f"strategy; treat this assessment as directional only."
         )
         return rec
 
@@ -197,27 +200,28 @@ def build_recommendation(
     parts: List[str] = []
     if gap > _OVERPRICED_THRESHOLD:
         parts.append(
-            f"The asking price is {gap:+.0f}% above estimated fair value. "
-            f"This property appears significantly overpriced. "
-            f"Do not offer more than {format_currency(balanced)} without exceptional justification."
+            f"The asking price is {gap:+.0f}% above the assessed fair value, "
+            f"materially outside the evidence-supported range. "
+            f"An offer above {format_currency(balanced)} would not be supported "
+            f"by the evidence without additional justification."
         )
     elif gap > _SLIGHTLY_ABOVE_THRESHOLD:
         parts.append(
-            f"The asking price is {gap:+.0f}% above fair value. "
-            f"Open at {format_currency(rec.suggested_initial_offer)} and "
-            f"do not exceed {format_currency(rec.walk_away_price)}."
+            f"The asking price is {gap:+.0f}% above the assessed fair value. "
+            f"An opening offer of {format_currency(rec.suggested_initial_offer)} is suggested, "
+            f"with {format_currency(rec.walk_away_price)} as the upper limit supported by the evidence."
         )
     elif gap > _SLIGHTLY_UNDERVALUED_THRESHOLD:
         parts.append(
-            f"The asking price is within {abs(gap):.0f}% of fair value. "
-            f"Fairly priced but still negotiate. "
-            f"Open at {format_currency(rec.suggested_initial_offer)}."
+            f"The asking price is within {abs(gap):.0f}% of the assessed fair value. "
+            f"An opening offer of {format_currency(rec.suggested_initial_offer)} is suggested "
+            f"to establish negotiating room."
         )
     else:
         parts.append(
-            f"The asking price is {abs(gap):.0f}% below estimated fair value. "
-            f"Potentially undervalued - investigate why before offering. "
-            f"Open at {format_currency(rec.suggested_initial_offer)}."
+            f"The asking price is {abs(gap):.0f}% below the assessed fair value. "
+            f"An opening offer of {format_currency(rec.suggested_initial_offer)} is suggested; "
+            f"the reason for the discount to comparable evidence should be confirmed before proceeding."
         )
     rec.offer_reasoning = " ".join(parts)
 

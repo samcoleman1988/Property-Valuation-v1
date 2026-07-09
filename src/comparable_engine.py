@@ -589,8 +589,10 @@ def _estimate_distance_from_postcode(
 def _summarise_evidence(evidence: ComparableEvidence) -> str:
     parts = []
     parts.append(
-        f"{evidence.total_fetched} sales fetched. "
-        f"{evidence.total_excluded} excluded by hard gates."
+        f"{evidence.total_fetched} nearby sales were reviewed; "
+        f"{evidence.total_excluded} were screened but excluded because they were "
+        f"not sufficiently comparable (different property type, new-build status, "
+        f"sale date outside the valuation window, or an unrepresentative price)."
     )
     parts.append(
         f"Tier A: {evidence.tier_a_count}, "

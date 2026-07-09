@@ -269,20 +269,20 @@ def _assess_overpricing_risk(ra: RiskAssessment, recommendation: Recommendation)
         ra.flags.append(RiskFlag(
             category="Pricing",
             severity="High",
-            title=f"Significantly overpriced ({gap:+.0f}%)",
+            title=f"Asking price materially above assessed value ({gap:+.0f}%)",
             explanation=(
-                f"Asking price exceeds estimated fair value by {gap:.0f}%. "
-                f"Risk of negative equity from day one."
+                f"The asking price exceeds the assessed fair value by {gap:.0f}%, "
+                f"which may leave the purchase price above realisable value shortly after completion."
             ),
-            mitigation="Do not offer at or near asking price. Negotiate aggressively or walk away.",
+            mitigation="An offer materially below asking price, supported by the comparable evidence, is recommended.",
         ))
     elif gap > 10:
         ra.flags.append(RiskFlag(
             category="Pricing",
             severity="Medium",
-            title=f"Overpriced ({gap:+.0f}%)",
-            explanation=f"Asking price is {gap:.0f}% above estimated fair value.",
-            mitigation="Negotiate firmly. Use comparable evidence to justify lower offer.",
+            title=f"Asking price above assessed value ({gap:+.0f}%)",
+            explanation=f"The asking price is {gap:.0f}% above the assessed fair value.",
+            mitigation="An offer below asking price, supported by the comparable evidence, is recommended.",
         ))
 
 

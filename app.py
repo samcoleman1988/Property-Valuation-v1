@@ -143,6 +143,25 @@ with st.sidebar:
     override_sqft = st.number_input("Override Floor Area (sq ft)", min_value=0, value=0, step=50)
     override_tenure = st.selectbox("Override Tenure", ["", "Freehold", "Leasehold", "Share of Freehold"], index=0)
 
+    personal_destinations = []
+    if mode_key in ("personal", "both"):
+        st.divider()
+        st.subheader("Optional Personal Destinations")
+        st.caption(
+            "Only used for personal purchase convenience scoring — never part of "
+            "the generic investment valuation. Add up to 3 places you personally "
+            "care about (e.g. workplace, a school). Leave blank for a generic "
+            "investment-style report."
+        )
+        for i in range(1, 4):
+            cols = st.columns([1, 1])
+            with cols[0]:
+                dest_name = st.text_input(f"Destination {i} name", key=f"dest_name_{i}", placeholder="e.g. Workplace")
+            with cols[1]:
+                dest_postcode = st.text_input(f"Destination {i} postcode", key=f"dest_pc_{i}", placeholder="e.g. OX1 2JD")
+            if dest_name and dest_postcode:
+                personal_destinations.append({"name": dest_name, "postcode": dest_postcode})
+
     st.divider()
     st.subheader("Data Sources")
     _epc_key = bool(get_epc_key())
@@ -375,6 +394,7 @@ if st.button("Analyse Property", type="primary", disabled=not url):
             postcode=listing.postcode,
             latitude=listing.latitude or 0,
             longitude=listing.longitude or 0,
+            personal_destinations=personal_destinations,
         )
         location_dict = location.to_dict()
         status.update(label="Location assessment complete", state="complete")
@@ -696,17 +716,20 @@ if st.button("Analyse Property", type="primary", disabled=not url):
     dim_cols = st.columns(4)
     for i, dim in enumerate(dims):
         with dim_cols[i % 4]:
-            colour = "normal"
-            if dim.score >= 7:
-                colour = "off"
-            elif dim.score <= 3:
-                colour = "inverse"
-            st.metric(
-                dim.name,
-                f"{dim.score}/10 ({dim.label})",
-                delta=f"wt: {dim.weight:.0f}%",
-                delta_color=colour,
-            )
+            if not dim.assessed:
+                st.metric(dim.name, "Not assessed", delta="excluded from score", delta_color="off")
+            else:
+                colour = "normal"
+                if dim.score >= 7:
+                    colour = "off"
+                elif dim.score <= 3:
+                    colour = "inverse"
+                st.metric(
+                    dim.name,
+                    f"{dim.score}/10 ({dim.label})",
+                    delta=f"wt: {dim.weight:.0f}%",
+                    delta_color=colour,
+                )
             st.caption(dim.explanation)
 
     # Adjustments Applied
@@ -808,9 +831,21 @@ if st.button("Analyse Property", type="primary", disabled=not url):
 
     # Location
     with st.expander("Location Assessment", expanded=False):
-        st.metric("Location Score", f"{location_dict.get('location_score', 0)}/10")
-        for d in location_dict.get("distances", []):
-            st.write(f"  - **{d['name']}:** {d['distance_miles']} miles ({d['drive_time_estimate']})")
+        distances = location_dict.get("distances", [])
+        if location_dict.get("assessed") and distances:
+            st.write("**Personal destination scoring** — not part of the generic investment valuation.")
+            st.metric("Personal Location Score", f"{location_dict.get('location_score', 0)}/10")
+            for d in distances:
+                st.write(f"  - **{d['name']}:** {d['distance_miles']} miles ({d['drive_time_estimate']})")
+        else:
+            st.metric("Location Assessment", "Not assessed")
+            st.caption(
+                "Generic location scoring is not currently available. Add personal "
+                "destinations in Personal Purchase mode if commute/access scoring "
+                "is required."
+            )
+        for gap in location_dict.get("data_gaps", []):
+            st.caption(gap)
         for w in location_dict.get("warnings", []):
             st.caption(w)
 

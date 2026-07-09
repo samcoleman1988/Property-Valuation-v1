@@ -23,6 +23,12 @@ class DimensionScore:
     label: str = ""          # e.g. "Strong", "Weak"
     explanation: str = ""
     key_drivers: List[str] = field(default_factory=list)
+    # False means this dimension has no real data behind it (e.g. Location
+    # Quality with no personal destinations configured) and must be
+    # excluded from the overall_score weighting entirely — not scored 0,
+    # not scored as neutral, simply not counted, so it can't silently bias
+    # the investment score in either direction.
+    assessed: bool = True
 
 
 @dataclass
@@ -147,6 +153,14 @@ def calculate_scorecard(
     for dim in sc.dimensions:
         w = weight_map.get(dim.name, 10.0)
         dim.weight = w
+        if not dim.assessed:
+            # Excluded entirely, not scored 0 or neutral — an unassessed
+            # dimension (e.g. Location Quality with no personal
+            # destinations) must not silently pull the overall score in
+            # either direction.
+            dim.weighted_score = 0.0
+            dim.label = "Not assessed"
+            continue
         dim.weighted_score = dim.score * w
         dim.label = _label(dim.score)
         total_weighted += dim.weighted_score
@@ -192,25 +206,25 @@ def _score_fair_value(dim: DimensionScore, recommendation: Recommendation):
 
     if gap < -10:
         dim.score = 10
-        dim.explanation = f"Asking price is {abs(gap):.0f}% below estimated fair value. Potential bargain if evidence is reliable."
+        dim.explanation = f"Asking price is {abs(gap):.0f}% below the assessed fair value, subject to the evidence being reliable."
     elif gap < -5:
         dim.score = 8
-        dim.explanation = f"Asking price is {abs(gap):.0f}% below fair value. Looks well-priced."
+        dim.explanation = f"Asking price is {abs(gap):.0f}% below the assessed fair value."
     elif gap < 0:
         dim.score = 7
-        dim.explanation = f"Asking price is {abs(gap):.0f}% below fair value. Slightly favourable."
+        dim.explanation = f"Asking price is {abs(gap):.0f}% below the assessed fair value."
     elif gap < 5:
         dim.score = 6
-        dim.explanation = f"Asking price is within {gap:.0f}% of fair value. Fairly priced."
+        dim.explanation = f"Asking price is within {gap:.0f}% of the assessed fair value."
     elif gap < 10:
         dim.score = 4
-        dim.explanation = f"Asking price is {gap:.0f}% above fair value. Overpriced unless negotiated."
+        dim.explanation = f"Asking price is {gap:.0f}% above the assessed fair value; negotiation is advised."
     elif gap < 20:
         dim.score = 2
-        dim.explanation = f"Asking price is {gap:.0f}% above fair value. Significantly overpriced."
+        dim.explanation = f"Asking price is {gap:.0f}% above the assessed fair value, materially outside the evidence-supported range."
     else:
         dim.score = 1
-        dim.explanation = f"Asking price is {gap:.0f}% above fair value. Avoid at this price."
+        dim.explanation = f"Asking price is {gap:.0f}% above the assessed fair value, well outside the evidence-supported range."
 
     dim.key_drivers.append(f"Asking/fair gap: {gap:+.1f}%")
     dim.key_drivers.append(f"Pricing classification: {recommendation.pricing_classification} ({recommendation.source_engine})")
@@ -230,28 +244,28 @@ def _score_negotiation(dim: DimensionScore, recommendation: Recommendation):
     if gap > 20:
         dim.score = 9
         dim.explanation = (
-            f"Asking price is {gap:.0f}% above fair value. "
-            f"Significant negotiation room. Vendor may be testing the market."
+            f"Asking price is {gap:.0f}% above the assessed fair value, "
+            f"indicating substantial negotiation room based on the evidence."
         )
-        dim.key_drivers.append("Large overpricing suggests negotiability")
+        dim.key_drivers.append("Asking price materially exceeds evidence-supported value")
     elif gap > 10:
         dim.score = 7
         dim.explanation = (
-            f"Asking price is {gap:.0f}% above fair value. "
-            f"Good negotiation room if vendor is motivated."
+            f"Asking price is {gap:.0f}% above the assessed fair value, "
+            f"indicating meaningful negotiation room."
         )
     elif gap > 5:
         dim.score = 6
-        dim.explanation = f"Moderate room to negotiate down from asking price."
+        dim.explanation = f"Moderate room to negotiate below the asking price."
     elif gap > 0:
         dim.score = 5
-        dim.explanation = f"Some room to negotiate but property is close to fair value."
+        dim.explanation = f"Limited room to negotiate; the asking price is close to the assessed fair value."
     elif gap > -5:
         dim.score = 4
-        dim.explanation = f"Priced at or below fair value. Less leverage for negotiation."
+        dim.explanation = f"Priced at or below the assessed fair value, with less scope for negotiation."
     else:
         dim.score = 3
-        dim.explanation = f"Priced well below fair value. Little negotiation leverage - act fast."
+        dim.explanation = f"Priced well below fair value, limiting further negotiation leverage."
 
     if recommendation.suggested_initial_offer > 0:
         dim.key_drivers.append(f"Suggested opening: {format_currency(recommendation.suggested_initial_offer)}")
@@ -406,9 +420,17 @@ def _score_resale(dim: DimensionScore, val: ValuationResult, location: dict):
     elif val.hpi_annual_growth < 1:
         score -= 1
 
-    if location.get("location_score", 5) >= 7:
+    # location_score is None (not 5) when location wasn't assessed at all —
+    # .get(key, 5) doesn't catch that since the key is present with value
+    # None. Treat "not assessed" as neutral here (contributes neither a
+    # bonus nor a penalty to Resale Potential — this is an internal
+    # heuristic input, not something displayed as a location score).
+    loc_score = location.get("location_score")
+    if loc_score is None:
+        loc_score = 5
+    if loc_score >= 7:
         score += 1
-    elif location.get("location_score", 5) <= 3:
+    elif loc_score <= 3:
         score -= 1
 
     dim.score = max(1, min(10, score))
@@ -426,31 +448,43 @@ def _score_resale(dim: DimensionScore, val: ValuationResult, location: dict):
 
 
 def _score_location(dim: DimensionScore, location: dict, mode: str):
-    """Location quality relative to user's needs."""
-    if not location:
-        dim.score = 5
-        dim.explanation = "Location not assessed."
+    """Location quality relative to any personally-configured destinations.
+
+    There is no generic amenity data source wired up (see transport.py),
+    and none is fabricated to fill the gap. Without personal
+    destinations, this dimension is marked unassessed — excluded from
+    the overall_score weighting entirely (see calculate_scorecard), not
+    scored as neutral or average.
+    """
+    distances = (location or {}).get("distances") or []
+    if not distances:
+        dim.assessed = False
+        dim.score = 0
+        dim.explanation = (
+            "Generic location scoring is not currently available. Add personal "
+            "destinations in Personal Purchase mode if commute/access scoring "
+            "is required."
+        )
         return
 
-    loc_score = location.get("location_score", 5)
-    dim.score = min(10, loc_score)
-
-    home_dist = location.get("home_distance_miles")
-    work_dist = location.get("work_distance_miles")
+    dim.assessed = True
+    loc_score = location.get("location_score")
+    dim.score = min(10, loc_score) if loc_score is not None else 0
 
     if dim.score >= 8:
-        dim.explanation = "Excellent location for stated needs."
+        dim.explanation = "Well placed relative to the configured personal destinations."
     elif dim.score >= 6:
-        dim.explanation = "Good location with reasonable access."
+        dim.explanation = "Reasonable access to the configured personal destinations."
     elif dim.score >= 4:
-        dim.explanation = "Acceptable location with trade-offs."
+        dim.explanation = "Acceptable access to the configured personal destinations, with some trade-offs."
     else:
-        dim.explanation = "Poor location relative to requirements."
+        dim.explanation = "Limited access to the configured personal destinations."
 
-    if home_dist is not None:
-        dim.key_drivers.append(f"Distance from home: {home_dist:.1f} miles")
-    if work_dist is not None:
-        dim.key_drivers.append(f"Distance from work: {work_dist:.1f} miles")
+    for d in distances:
+        name = d.get("name", "Destination")
+        miles = d.get("distance_miles")
+        if miles is not None:
+            dim.key_drivers.append(f"Distance to {name}: {miles:.1f} miles")
 
 
 def _score_risk(dim: DimensionScore, recommendation: Recommendation, val: ValuationResult, planning: dict, btl: dict):
@@ -541,13 +575,13 @@ def _collect_risks_and_opportunities(
     if gap < -5:
         sc.key_opportunities.append(f"Priced {abs(gap):.0f}% below fair value")
     if sc.development_opportunity.score >= 6:
-        sc.key_opportunities.append("Good development/extension potential")
+        sc.key_opportunities.append("Development or extension potential, subject to planning")
     if btl.get("gross_yield", 0) >= 6:
-        sc.key_opportunities.append(f"Strong rental yield: {btl['gross_yield']:.1f}%")
+        sc.key_opportunities.append(f"Rental yield of {btl['gross_yield']:.1f}%")
     if gap > 10:
-        sc.key_opportunities.append("Large negotiation margin if vendor is motivated")
+        sc.key_opportunities.append("Gap to fair value suggests room for negotiation")
     if sc.location_quality.score >= 8:
-        sc.key_opportunities.append("Excellent location")
+        sc.key_opportunities.append("Location scores highly on assessed criteria")
 
 
 def _generate_verdict(sc: InvestmentScorecard, mode: str) -> str:
@@ -583,9 +617,9 @@ def _generate_recommendation(
     parts = [recommendation.offer_reasoning]
 
     if sc.key_risks:
-        parts.append(f"Key risk: {sc.key_risks[0]}")
+        parts.append(f"Principal risk: {sc.key_risks[0]}.")
 
     if sc.key_opportunities:
-        parts.append(f"Key opportunity: {sc.key_opportunities[0]}")
+        parts.append(f"Supporting factor: {sc.key_opportunities[0]}.")
 
     return " ".join(p for p in parts if p)

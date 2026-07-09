@@ -81,7 +81,7 @@ Any `git push` to the connected branch triggers an automatic redeploy on Streaml
 6. **Generates an offer strategy** (initial offer, max sensible, walk-away)
 7. **Assesses extension/planning potential** using the Planning Data API
 8. **Runs buy-to-let analysis** with yield and cash flow estimates
-9. **Checks location** distances to reference points (OX33 1RT, John Radcliffe Hospital)
+9. **Checks location** — generic by default (no personal locations embedded); optionally add your own destinations (home, workplace, a school) in Settings to see distances
 10. **Produces a PDF report** with all findings
 
 ## Setup
@@ -216,6 +216,10 @@ property_value_tool/
 - **Generic street names** (e.g. "High Street", "Church Road") can still produce heterogeneous comparables spanning very different property values and ages
 - **Cold Land Registry fetches are slow** — the first time a postcode/property-type combination is queried it can take several minutes; cached lookups are near-instant
 - **Development/extension appraisal is still basic** — uses Planning Data API constraint flags only, not a full cost/upside model
+- **Location scoring is not currently a generic investment metric.** There's no free/no-API-key data source wired up for schools, supermarkets, transport links, flood risk overlays, or deprivation indices, so the tool does not produce a generic Location Quality score — earlier versions embedded the developer's own home postcode and a specific hospital as fixed reference points, which has been removed entirely. Location Assessment shows **"Not assessed"** by default and is excluded from the Investment Scorecard's overall score (not scored as neutral/average — genuinely left out of the weighting) until you add your own destinations.
+- **Personal destinations are optional, off by default, and personal-only.** In Personal Purchase or Both mode, Settings → Optional Personal Destinations lets you add up to 3 places (e.g. workplace, a school) to see distance/drive-time figures. This is explicitly labelled "Personal destination scoring" wherever it appears (sidebar, report, PDF) and is never used in the generic investment valuation, fair value, or Investment Scorecard weighting beyond the Location Quality dimension itself.
+- **Nearest railway station distance is not calculated** — check National Rail or a map service directly.
+- **Future generic location scoring** (schools, rail links, amenities, flood risk, deprivation indices) is a planned enhancement, not yet built — it would need a real free data source per metric, in line with this project's no-invented-data, no-paid-API principles.
 
 ## Model Validation Baseline
 
