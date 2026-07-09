@@ -24,7 +24,35 @@ from src.transport import assess_location
 from src.report_generator import generate_report
 from src.epc import estimate_epc_impact, lookup_subject_floor_area, get_epc_key
 from src.property_db import save_property, get_all_properties
+from src.recommendation import build_recommendation
 from src.utils import format_currency, format_pct
+
+
+def _ensure_recommendation(final, source_engine: str):
+    """Return final.recommendation, building it on the fly if missing.
+
+    Every current code path in calculate_valuation() / blend_evidence()
+    sets .recommendation before returning a result object, so this should
+    normally just return the existing one. This guards against a stale or
+    partially-constructed result object (e.g. picked up mid-deploy, or
+    from a future code path that forgets to set it) causing an
+    AttributeError deep in the page instead of a graceful fallback. Uses
+    the exact same build_recommendation() the engines themselves call —
+    no separate logic, no different numbers.
+    """
+    rec = getattr(final, "recommendation", None)
+    if rec is not None:
+        return rec
+    return build_recommendation(
+        fair_value_balanced=final.fair_value_balanced,
+        fair_value_conservative=final.fair_value_conservative,
+        asking_price=final.asking_price,
+        asking_vs_fair_gap_pct=final.asking_vs_fair_gap_pct,
+        valuation_status=final.valuation_status,
+        sufficient_evidence=final.sufficient_evidence,
+        source_engine=source_engine,
+    )
+
 
 st.set_page_config(
     page_title="Property Investment Decision Engine",
@@ -294,9 +322,11 @@ if st.button("Analyse Property", type="primary", disabled=not url):
     # entirely from whichever engine is primary, never a mix of the two.
     # V1's own recommendation (valuation.recommendation) always exists
     # separately and is used only by the "Legacy V1 Comparison" expander.
+    # _ensure_recommendation() is a defensive fallback, not a second
+    # implementation — see its docstring.
     primary_recommendation = (
-        v2_result.final.recommendation if (use_v2 and v2_result)
-        else valuation.recommendation
+        _ensure_recommendation(v2_result.final, "V2") if (use_v2 and v2_result)
+        else _ensure_recommendation(valuation, "V1")
     )
 
     # Step 5: Planning / Extension
