@@ -216,6 +216,7 @@ def check_3():
 
     scorecard = calculate_scorecard(
         valuation=valuation,
+        recommendation=valuation.recommendation,
         planning_result=planning_dict,
         btl_result={},
         location_result=location_dict,
@@ -225,6 +226,7 @@ def check_3():
 
     risk = assess_risks(
         valuation=valuation,
+        recommendation=valuation.recommendation,
         signals=signals,
         planning_result=planning_dict,
         btl_result={},

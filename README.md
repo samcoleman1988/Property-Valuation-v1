@@ -10,19 +10,22 @@ The app uses the **V2 Evidence-Based Valuation** engine by default. This analyse
 
 The original V1 weighted-average engine is retained as **Legacy V1 Comparison** and can be selected in the sidebar for regression testing.
 
-**Current production baseline: `v2-evidence-status-fallback-guard-real-hpi`** — see [Validation Status](#validation-status) below and `baselines/MANIFEST.json` for the full version history.
+**Current production baseline: `v2-evidence-status-fallback-guard-real-hpi-cr1-h0`** — see [Validation Status](#validation-status) below and `baselines/MANIFEST.json` for the full version history.
 
 ## Validation Status
 
-**Baseline:** `v2-evidence-status-fallback-guard-real-hpi` (2026-07-09)
+**Baseline:** `v2-evidence-status-fallback-guard-real-hpi-cr1-h0` (2026-07-09)
 
 - ✅ 20-property validation set: 20/20 succeeded, 0 failures
 - ✅ Real regional HPI active — comparable prices are adjusted using actual UK House Price Index data, not the flat-rate fallback
+- ✅ **CR1 — Single Source of Truth for Recommendations** complete: pricing classification, investment tagline, negotiation stance, and offer strategy are now decided exactly once (`src/recommendation.py`), consumed identically by the banner, scorecard, risk assessor, and PDF. Six independent duplicate implementations found during a full-codebase audit were removed; `valuation.py` and `scoring.py` (unreferenced prototype code with their own copies of this logic) were deleted.
+- ✅ **H0 — displayed confidence matches Evidence Status** complete: a Direct or Development group classified `FALLBACK_ONLY` can no longer display Medium or High confidence — it's capped at Low(25) with an explicit driver explaining why. Display-only; verified not to affect fair value, weighting, Evidence Status, or Recommendation.
 - **Latest HPI month available:** 2026-04
-- **Evidence status totals** across the 20-property set (80 group-slots: 4 evidence groups × 20 properties): **26 STRONG, 13 WEAK, 8 FALLBACK_ONLY, 33 EMPTY**
-- No credibility judgement worsened when the HPI parser fix was applied (2 properties improved from REVIEW to CREDIBLE, 18 unchanged, 0 regressed)
+- **Evidence status totals** across the 20-property set (80 group-slots: 4 evidence groups × 20 properties): **26 STRONG, 13 WEAK, 8 FALLBACK_ONLY, 33 EMPTY** — unchanged since the real-HPI baseline; CR1 and H0 are both consistency/display fixes, not weighting changes
+- All 8 FALLBACK_ONLY groups in the validation set had their displayed confidence capped to Low — none showed Medium/High confidence after this fix
+- Fair values, final confidence, and comparable selection are byte-identical to the pre-CR1/pre-H0 baseline for every property
 
-Full run data: `validation_baselines/20260709_121816_baseline_v2-evidence-status-fallback-guard-real-hpi.csv` / `.json`. See `baselines/v2-evidence-status-fallback-guard-real-hpi/manifest.json` for what this baseline includes.
+Full run data: `validation_baselines/20260709_161403_baseline_v2-evidence-status-fallback-guard-real-hpi-cr1-h0.csv` / `.json`. See `baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0/manifest.json` for what this baseline includes and the full validation methodology.
 
 ## Recommended Operating Workflow
 

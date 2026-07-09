@@ -290,6 +290,15 @@ if st.button("Analyse Property", type="primary", disabled=not url):
                 v2_explanation = None
                 status.update(label=f"V2 valuation failed: {e}", state="error")
 
+    # The single, authoritative recommendation for this run — built
+    # entirely from whichever engine is primary, never a mix of the two.
+    # V1's own recommendation (valuation.recommendation) always exists
+    # separately and is used only by the "Legacy V1 Comparison" expander.
+    primary_recommendation = (
+        v2_result.final.recommendation if (use_v2 and v2_result)
+        else valuation.recommendation
+    )
+
     # Step 5: Planning / Extension
     with st.status("Assessing planning constraints...", expanded=False) as status:
         try:
@@ -343,6 +352,7 @@ if st.button("Analyse Property", type="primary", disabled=not url):
     # Step 8: Investment Scorecard
     scorecard = calculate_scorecard(
         valuation=valuation,
+        recommendation=primary_recommendation,
         planning_result=planning_dict,
         btl_result=btl_dict,
         location_result=location_dict,
@@ -352,6 +362,7 @@ if st.button("Analyse Property", type="primary", disabled=not url):
     # Step 9: Risk Assessment
     risk = assess_risks(
         valuation=valuation,
+        recommendation=primary_recommendation,
         signals=signals,
         planning_result=planning_dict,
         btl_result=btl_dict,
@@ -372,10 +383,11 @@ if st.button("Analyse Property", type="primary", disabled=not url):
     if use_v2 and v2_result and v2_explanation:
         v2f = v2_result.final
 
-        # V2 Verdict Banner
+        # V2 Verdict Banner — reads the single primary_recommendation, built
+        # from V2's own numbers (never V1's) when V2 is the primary engine.
         verdict_col1, verdict_col2, verdict_col3 = st.columns([2, 1, 1])
         with verdict_col1:
-            st.subheader(valuation.investment_tagline)
+            st.subheader(primary_recommendation.investment_tagline)
             st.caption(scorecard.verdict)
         with verdict_col2:
             st.metric("Overall Score", f"{scorecard.overall_score:.0f}/100")
@@ -567,7 +579,7 @@ if st.button("Analyse Property", type="primary", disabled=not url):
 
         verdict_col1, verdict_col2, verdict_col3 = st.columns([2, 1, 1])
         with verdict_col1:
-            st.subheader(valuation.investment_tagline)
+            st.subheader(primary_recommendation.investment_tagline)
             st.caption(scorecard.verdict)
         with verdict_col2:
             st.metric("Overall Score", f"{scorecard.overall_score:.0f}/100")
@@ -835,6 +847,7 @@ if st.button("Analyse Property", type="primary", disabled=not url):
             mode=mode_key,
             v2_result=v2_result,
             v2_explanation=v2_explanation,
+            recommendation=primary_recommendation.to_dict(),
         )
         status.update(label="PDF report generated", state="complete")
 

@@ -187,15 +187,23 @@ def generate_report(
     mode: str = "personal",
     v2_result=None,
     v2_explanation=None,
+    recommendation: dict = None,
 ) -> str:
-    """Generate the full investment decision PDF report."""
+    """Generate the full investment decision PDF report.
+
+    `recommendation` is the single source of truth for tagline and offer
+    strategy (see recommendation.py) — pass the primary engine's
+    Recommendation.to_dict(). Falls back to `valuation`'s own fields if
+    not provided, for backward compatibility with any other caller.
+    """
     pdf = PropertyReport()
     pdf.alias_nb_pages()
     pdf.add_page()
+    recommendation = recommendation or {}
 
     address = listing.get("address", "Unknown Address")
     v_status = valuation.get("valuation_status", "Unknown")
-    tagline = valuation.get("investment_tagline", "")
+    tagline = recommendation.get("investment_tagline", valuation.get("investment_tagline", ""))
     overall = investment_score.get("overall_score", 0)
     insufficient = v_status == "Insufficient evidence"
     weak = v_status == "Weak evidence"
@@ -334,9 +342,9 @@ def generate_report(
 
     # === 4. Offer Strategy ===
     if not insufficient:
-        initial = valuation.get("suggested_initial_offer", 0)
-        max_offer = valuation.get("max_sensible_offer", 0)
-        walkaway = valuation.get("walk_away_price", 0)
+        initial = recommendation.get("suggested_initial_offer", valuation.get("suggested_initial_offer", 0))
+        max_offer = recommendation.get("max_sensible_offer", valuation.get("max_sensible_offer", 0))
+        walkaway = recommendation.get("walk_away_price", valuation.get("walk_away_price", 0))
         if initial or max_offer:
             pdf.section_title(f"{next_sec()}. Offer Strategy")
             if weak:
@@ -348,7 +356,7 @@ def generate_report(
                 pdf.kv("Maximum Sensible Offer", format_currency(max_offer), bold_value=True)
             if walkaway:
                 pdf.kv("Walk-Away Price", format_currency(walkaway))
-            reasoning = valuation.get("negotiation_reasoning", "")
+            reasoning = recommendation.get("offer_reasoning", valuation.get("negotiation_reasoning", ""))
             if reasoning:
                 pdf.ln(1)
                 pdf.body(reasoning)

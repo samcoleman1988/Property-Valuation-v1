@@ -115,8 +115,8 @@ for t in TESTS:
 
     # PDF generation with V2
     try:
-        scorecard = calculate_scorecard(valuation=v1, planning_result={}, btl_result={}, location_result={}, mode="personal")
-        risk = assess_risks(valuation=v1, signals=signals, planning_result={}, btl_result={}, tenure=listing.tenure or "")
+        scorecard = calculate_scorecard(valuation=v1, recommendation=v1.recommendation, planning_result={}, btl_result={}, location_result={}, mode="personal")
+        risk = assess_risks(valuation=v1, recommendation=v1.recommendation, signals=signals, planning_result={}, btl_result={}, tenure=listing.tenure or "")
         score_dict = scorecard.to_dict()
         risk_dict = risk.to_dict()
         score_dict["flags"] = risk_dict.get("flags", [])

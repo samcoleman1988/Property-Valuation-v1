@@ -1,0 +1,31 @@
+{
+  "version": "v2-evidence-status-fallback-guard-real-hpi-cr1",
+  "version_date": "2026-07-09",
+  "created_at": "2026-07-09T15:35:00",
+  "parent_version": "v2-evidence-status-fallback-guard-real-hpi",
+  "description": "CR1: Single Source of Truth for Recommendations. Introduces src/recommendation.py as the one and only place pricing classification, investment tagline, negotiation stance, offer strategy, and offer reasoning are decided. V1 and V2 each call it once, with only their own numbers, at the end of their own pipeline. Six independent duplicate implementations of this logic (found via a full-codebase audit) were removed and replaced with consumers of the shared Recommendation object.",
+  "changes_in_this_version": [
+    "New module src/recommendation.py: Recommendation dataclass + build_recommendation() — the single implementation of pricing_classification / investment_tagline / negotiation_stance / suggested_initial_offer / max_sensible_offer / walk_away_price / offer_reasoning",
+    "valuation_engine.py (V1): removed _generate_tagline() and _calculate_offer_strategy() (moved to recommendation.py verbatim, thresholds unchanged); calculate_valuation() now calls build_recommendation() once and stores the result on ValuationResult.recommendation, mirroring flat fields for backward compatibility",
+    "valuation_engine_v2.py (V2): FinalValuation.investment_tagline/suggested_initial_offer/max_sensible_offer/walk_away_price/negotiation_reasoning were declared but never populated before this version (confirmed via audit — zero assignment sites). blend_evidence() now calls build_recommendation() once with V2's own numbers and populates FinalValuation.recommendation + the mirrored flat fields",
+    "investment_scorecard.py: calculate_scorecard() takes a new required `recommendation` parameter. _score_fair_value(), _score_negotiation(), _score_risk() (pricing portion only), _collect_risks_and_opportunities() (pricing portion only), and _generate_recommendation() now consume Recommendation instead of independently deriving pricing judgements from val.asking_vs_fair_gap_pct — this was FIVE separate duplicate implementations within this one file, found during the audit (the original review only caught two)",
+    "risk_assessor.py: assess_risks() takes a new required `recommendation` parameter; _assess_overpricing_risk() now consumes Recommendation instead of val.asking_vs_fair_gap_pct",
+    "report_generator.py: generate_report() takes a new optional `recommendation` dict parameter; the tagline and Offer Strategy PDF section now prefer it over valuation's raw V1 fields (falls back to the old behaviour if not supplied, for backward compatibility)",
+    "app.py: computes primary_recommendation once (V2's Recommendation when V2 is primary, V1's when V1 is primary) and threads it into calculate_scorecard(), assess_risks(), the verdict banner, and generate_report(). The 'Legacy V1 Comparison' expander continues to show V1's own recommendation, clearly labelled, unaffected by this change",
+    "Deleted valuation.py and scoring.py — confirmed zero imports anywhere in the codebase before removal; these were earlier prototype versions of valuation_engine.py/investment_scorecard.py that independently reimplemented the same tagline/verdict/offer logic a further two times but were never actually reachable at runtime"
+  ],
+  "not_changed": [
+    "comparable selection (all gates, affinity scoring, fallback admission guard)",
+    "evidence weighting and reconciliation (blend_evidence's weight profiles, status authority multipliers)",
+    "confidence scoring maths (group-level and blended)",
+    "evidence status classification (STRONG/WEAK/FALLBACK_ONLY/EMPTY)",
+    "fair value calculation (V1 and V2)",
+    "HPI adjustment"
+  ],
+  "validation": {
+    "method": "Full 20-property baseline re-run (validate_baseline.py) before and after, diffed field-by-field on v1_value, v2_value, confidence, and all four evidence groups' status/weight/comp_count.",
+    "result": "2 of 20 properties (Saxton Road, Witan Way) showed changed fair values, fully explained by comparable-count drift from cold Land Registry cache fetches during the run (Saxton Road: Direct 3->16, Development 4->10, Local Market 95->365 comps; Witan Way: Local Market 179->41 comps) — the same pre-existing recency/data-drift phenomenon already documented in the parent baseline's manifest, unrelated to this version's code changes. Evidence status totals (26 STRONG / 13 WEAK / 8 FALLBACK_ONLY / 33 EMPTY) and credibility totals (12/3/3/2) are identical to the parent baseline.",
+    "before_file": "validation_baselines/20260709_121816_baseline_v2-evidence-status-fallback-guard-real-hpi.json",
+    "after_file": "validation_baselines/20260709_150151_baseline_v2-evidence-status-fallback-guard-real-hpi-cr1.json"
+  }
+}

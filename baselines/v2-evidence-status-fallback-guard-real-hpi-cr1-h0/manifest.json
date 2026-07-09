@@ -1,0 +1,28 @@
+{
+  "version": "v2-evidence-status-fallback-guard-real-hpi-cr1-h0",
+  "version_date": "2026-07-09",
+  "created_at": "2026-07-09T16:20:00",
+  "parent_version": "v2-evidence-status-fallback-guard-real-hpi-cr1",
+  "description": "H0: displayed group confidence now matches Evidence Status. A Direct or Development group classified FALLBACK_ONLY can no longer display Medium or High confidence — it is capped at 25/\"Low\" with an explicit driver explaining why. Trust/explainability fix only; the cap is applied after the blended confidence calculation has already read each group's raw score, so it cannot affect fair value, weighting, Evidence Status, or Recommendation.",
+  "changes_in_this_version": [
+    "valuation_engine_v2.py: new _apply_confidence_status_cap(group) — the single implementation of the FALLBACK_ONLY confidence cap. If group.evidence_status == 'FALLBACK_ONLY': confidence_score = min(confidence_score, 25), confidence_label = 'Low', and a confidence_drivers entry is appended explaining the cap. EMPTY groups are left untouched (already 0/'None' from construction). STRONG/WEAK groups are untouched.",
+    "The cap is called from blend_evidence() on the direct and development group objects, AFTER _assess_blended_confidence() and the valuation_status mapping have already run — this was a deliberate placement decision, not the original one: applying the cap inside the group builders (build_direct_evidence_group / build_development_evidence_group) was tried first and found to leak into the blended confidence weighted-sum, which could cascade into final.valuation_status and therefore the Recommendation. Moving it to after blending made it genuinely display-only.",
+    "validate_baseline.py: added per-group confidence_label/confidence_score columns, and v1_recommendation_tagline/v2_recommendation_tagline columns, to the CSV/JSON schema — needed to verify this fix's before/after effect. Test-harness change only, not application logic."
+  ],
+  "not_changed": [
+    "comparable selection",
+    "evidence grouping",
+    "reconciliation weights (status-authority multipliers unchanged)",
+    "Evidence Status classification",
+    "fair value calculation",
+    "Recommendation (tagline, offer strategy, pricing classification)",
+    "scorecard calculations",
+    "PDF valuation numbers"
+  ],
+  "validation": {
+    "method": "Full 20-property baseline re-run (validate_baseline.py) before and after, diffed field-by-field on v1_value, v2_value, v2_confidence_score, evidence status/weight/comp_count per group, plus a targeted raw-vs-capped comparison for all 8 FALLBACK_ONLY groups (obtained by temporarily monkeypatching the cap to a no-op).",
+    "result": "20/20 properties succeeded. Fair values (V1 and V2) byte-identical to the CR1 baseline for all 20 properties. Final blended confidence_score/label unchanged (verified directly: Vyner Road stayed 44/\"Medium\" before and after). Evidence status totals unchanged: 26 STRONG / 13 WEAK / 8 FALLBACK_ONLY / 33 EMPTY. Reconciliation weights and comparable counts unchanged on every group, every property. All 8 FALLBACK_ONLY groups across the dataset had their displayed confidence capped to Low(25): Chestnut Close (Development, was Medium 43), Vyner Road South (Direct, was Medium 45; Development, was Medium 48), Dee Park Road (Development, was Medium 56), Acacia Grove (Development, was Medium 61), Bostock Road (Direct, was Medium 60; Development, was Medium 43), Bracken Close (Development, was Low 31, capped further to 25 for consistency).",
+    "before_file": "validation_baselines/20260709_150151_baseline_v2-evidence-status-fallback-guard-real-hpi-cr1.json",
+    "after_file": "validation_baselines/20260709_161403_baseline_v2-evidence-status-fallback-guard-real-hpi-cr1-h0.json"
+  }
+}

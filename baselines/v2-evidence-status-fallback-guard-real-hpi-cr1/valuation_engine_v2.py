@@ -34,7 +34,7 @@ from .recommendation import build_recommendation, Recommendation
 # this module — or a shared dependency like hpi.py — changes materially,
 # so validation runs can be tied back to a specific, reproducible version
 # of the engine.
-MODEL_VERSION = "v2-evidence-status-fallback-guard-real-hpi-cr1-h0"
+MODEL_VERSION = "v2-evidence-status-fallback-guard-real-hpi-cr1"
 MODEL_VERSION_DATE = "2026-07-09"
 
 MAX_DIRECT_AGE_DAYS = 1095   # 3 years
@@ -504,35 +504,6 @@ def _calculate_evidence_status(group: EvidenceGroup) -> tuple:
     return "WEAK", "; ".join(weak_reasons)
 
 
-_FALLBACK_ONLY_CONFIDENCE_CAP = 25
-
-
-def _apply_confidence_status_cap(group: EvidenceGroup) -> None:
-    """Cap displayed confidence so it can't overstate FALLBACK_ONLY evidence.
-
-    Group confidence_score is computed from comp count, recency, and price
-    spread — it has no idea whether the comps are even the right property
-    type. A FALLBACK_ONLY group (no exact/compatible types at all) can
-    still rack up points on those other axes and land on "Medium" or
-    "High", which is confusing sitting next to an explicit "no compatible
-    property types" status. Reconciliation weighting already suppresses
-    FALLBACK_ONLY groups correctly (status-authority ×0.05) — this only
-    fixes what's *displayed*, so it can't change fair value, weighting,
-    or the Evidence Status classification itself.
-
-    EMPTY groups are already 0/"None" from group construction and are
-    left alone here, per spec. STRONG/WEAK groups are untouched.
-    """
-    if group.evidence_status != "FALLBACK_ONLY":
-        return
-    group.confidence_score = min(group.confidence_score, _FALLBACK_ONLY_CONFIDENCE_CAP)
-    group.confidence_label = "Low"
-    group.confidence_drivers.append(
-        "Confidence capped because this group contains fallback-only "
-        "evidence with no compatible property types."
-    )
-
-
 def _extract_subject_street(listing: PropertyListing) -> str:
     """Extract and normalise the subject's street from its address.
 
@@ -804,11 +775,6 @@ def build_direct_evidence_group(
     # Evidence quality and status
     group.evidence_quality = _calculate_evidence_quality(group)
     group.evidence_status, group.evidence_status_reason = _calculate_evidence_status(group)
-    # NOTE: the FALLBACK_ONLY confidence display cap is applied later, in
-    # blend_evidence(), AFTER the blended confidence calculation has read
-    # this group's raw confidence_score — capping it here would leak into
-    # final.confidence_score / final.valuation_status and could change the
-    # Recommendation, which this fix must not do (display-only change).
 
     return group
 
@@ -1429,8 +1395,6 @@ def build_development_evidence_group(
     # Evidence quality and status
     group.evidence_quality = _calculate_evidence_quality(group)
     group.evidence_status, group.evidence_status_reason = _calculate_evidence_status(group)
-    # NOTE: see build_direct_evidence_group — the confidence display cap is
-    # applied later, in blend_evidence(), for the same reason.
 
     return group
 
@@ -2249,16 +2213,6 @@ def blend_evidence(
         else:
             final.valuation_status = "Insufficient evidence"
             final.sufficient_evidence = False
-
-    # --- Display-only confidence cap for FALLBACK_ONLY groups (H0) ---
-    # Applied AFTER _assess_blended_confidence() and the valuation_status
-    # mapping above, so the blended confidence score / status / downstream
-    # Recommendation are computed from each group's real confidence — this
-    # only corrects what gets DISPLAYED for Direct/Development groups
-    # whose evidence is FALLBACK_ONLY, so it can't cascade into fair
-    # value, weighting, Evidence Status, or the Recommendation.
-    _apply_confidence_status_cap(direct)
-    _apply_confidence_status_cap(development)
 
     # --- Gap analysis ---
     if asking > 0 and final.fair_value_balanced > 0:

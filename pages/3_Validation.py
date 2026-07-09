@@ -224,6 +224,7 @@ if st.button("Analyse & Record", type="primary", disabled=not url):
     # Step 8: Scorecard + Risk
     scorecard = calculate_scorecard(
         valuation=valuation,
+        recommendation=valuation.recommendation,
         planning_result=planning_dict,
         btl_result=btl_dict,
         location_result=location_dict,
@@ -231,6 +232,7 @@ if st.button("Analyse & Record", type="primary", disabled=not url):
     )
     risk = assess_risks(
         valuation=valuation,
+        recommendation=valuation.recommendation,
         signals=signals,
         planning_result=planning_dict,
         btl_result=btl_dict,

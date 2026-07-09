@@ -129,6 +129,8 @@ def run_one(p: dict) -> dict:
         "v2_value": None,
         "v2_confidence_label": None,
         "v2_confidence_score": None,
+        "v1_recommendation_tagline": None,
+        "v2_recommendation_tagline": None,
         "credibility_judgement": None,
         "gap_pct_vs_asking": None,
         "hpi_source": None,
@@ -141,6 +143,8 @@ def run_one(p: dict) -> dict:
         row[f"{key}_status"] = None
         row[f"{key}_weight"] = None
         row[f"{key}_comp_count"] = None
+        row[f"{key}_confidence_label"] = None
+        row[f"{key}_confidence_score"] = None
 
     start = time.time()
     try:
@@ -171,6 +175,8 @@ def run_one(p: dict) -> dict:
         row["v2_value"] = v2_val
         row["v2_confidence_label"] = v2.final.confidence_label
         row["v2_confidence_score"] = v2.final.confidence_score
+        row["v1_recommendation_tagline"] = v1.recommendation.investment_tagline if v1.recommendation else None
+        row["v2_recommendation_tagline"] = v2.final.recommendation.investment_tagline if v2.final.recommendation else None
         row["credibility_judgement"] = credibility_judgement(v2_val, p["asking"], v2.final.confidence_label)
         row["gap_pct_vs_asking"] = round((v2_val - p["asking"]) / p["asking"] * 100, 1) if v2_val > 0 else None
 
@@ -184,6 +190,8 @@ def run_one(p: dict) -> dict:
             row[f"{key}_status"] = g.evidence_status
             row[f"{key}_weight"] = round(g.weight_in_final, 4)
             row[f"{key}_comp_count"] = g.comp_count
+            row[f"{key}_confidence_label"] = g.confidence_label
+            row[f"{key}_confidence_score"] = g.confidence_score
 
     except Exception as e:
         row["error"] = str(e)

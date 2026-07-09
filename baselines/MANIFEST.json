@@ -10,7 +10,33 @@
       "version": "v2-evidence-status-fallback-guard-real-hpi",
       "version_date": "2026-07-09",
       "path": "baselines/v2-evidence-status-fallback-guard-real-hpi/",
-      "current": true
+      "current": false
+    },
+    {
+      "version": "v2-evidence-status-fallback-guard-real-hpi-cr1",
+      "version_date": "2026-07-09",
+      "path": "baselines/v2-evidence-status-fallback-guard-real-hpi-cr1/",
+      "current": false
+    },
+    {
+      "version": "v2-evidence-status-fallback-guard-real-hpi-cr1-h0",
+      "version_date": "2026-07-09",
+      "path": "baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0/",
+      "current": true,
+      "validated_at": "2026-07-09T16:14:35",
+      "validation_summary": {
+        "properties_run": 20,
+        "properties_succeeded": 20,
+        "fair_values_vs_cr1": "unchanged",
+        "final_confidence_vs_cr1": "unchanged",
+        "evidence_status_totals": {
+          "STRONG": 26,
+          "WEAK": 13,
+          "FALLBACK_ONLY": 8,
+          "EMPTY": 33
+        },
+        "fallback_only_groups_confidence_capped_to_low": 8
+      }
     }
   ]
 }

@@ -73,6 +73,7 @@ def run_test(name, postcode, property_type, bedrooms, asking_price,
         # 4. Scorecard
         scorecard = calculate_scorecard(
             valuation=valuation,
+            recommendation=valuation.recommendation,
             planning_result={},
             btl_result={},
             location_result={"location_score": 5, "distances": [], "warnings": []},
@@ -84,6 +85,7 @@ def run_test(name, postcode, property_type, bedrooms, asking_price,
         # 5. Risks
         risk = assess_risks(
             valuation=valuation,
+            recommendation=valuation.recommendation,
             signals=signals,
             planning_result={},
             btl_result={},
