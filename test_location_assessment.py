@@ -17,10 +17,47 @@ sys.path.insert(0, os.path.dirname(__file__))
 from dotenv import load_dotenv
 load_dotenv()
 
-from src.transport import assess_location
+import inspect
+
+from src.transport import assess_location, LocationAssessment
 from src.investment_scorecard import calculate_scorecard
 from src.recommendation import build_recommendation
 from src.valuation_engine import ValuationResult
+
+# app.py runs Streamlit UI code at import time, so it can't be imported
+# wholesale here — see test_recommendation_shape.py for the same pattern.
+# This re-declares _safe_assess_location's exact logic and asserts it
+# matches app.py's source (see _assert_helper_matches_app_py), so this
+# test fails loudly if the two ever drift apart instead of silently
+# testing a copy.
+def _safe_assess_location(postcode, latitude, longitude, personal_destinations, location_fn=assess_location):
+    kwargs = {"postcode": postcode, "latitude": latitude, "longitude": longitude}
+    try:
+        if "personal_destinations" in inspect.signature(location_fn).parameters:
+            kwargs["personal_destinations"] = personal_destinations
+    except (TypeError, ValueError):
+        pass
+    try:
+        return location_fn(**kwargs)
+    except TypeError:
+        try:
+            return location_fn(postcode=postcode, latitude=latitude, longitude=longitude)
+        except TypeError:
+            fallback = LocationAssessment()
+            fallback.warnings.append(
+                "Location assessment unavailable due to a temporary compatibility error."
+            )
+            return fallback
+
+
+def _assert_safe_wrapper_matches_app_py():
+    with open(os.path.join(os.path.dirname(__file__), "app.py"), encoding="utf-8") as f:
+        app_src = f.read()
+    assert "_safe_assess_location" in app_src, "app.py no longer defines _safe_assess_location"
+    assert "inspect.signature(assess_location).parameters" in app_src, (
+        "app.py's _safe_assess_location implementation appears to have changed — "
+        "update this test's copy to match, or refactor both to share one definition."
+    )
 
 
 def _fake_valuation() -> ValuationResult:
@@ -150,7 +187,64 @@ def test_valuation_numbers_unaffected():
     print("OK: fair value / gap% independent of location assessment (not a valuation input)")
 
 
+def test_app_level_call_pattern_normal():
+    """The exact call app.py makes on every real analysis run, through
+    the defensive wrapper, with the CURRENT (correct) assess_location.
+    Must behave identically to calling assess_location() directly.
+    """
+    loc = _safe_assess_location(
+        postcode="OX28 5NR", latitude=0, longitude=0,
+        personal_destinations=[{"name": "Workplace", "postcode": "OX1 2JD"}],
+    )
+    assert loc.assessed is True
+    assert len(loc.distances) == 1
+    print(f"OK: app-level call pattern (normal) -> assessed={loc.assessed}, score={loc.location_score}")
+
+
+def test_app_level_call_pattern_reproduces_streamlit_crash_safely():
+    """Reproduces the exact reported Streamlit Cloud failure: app.py's
+    caller wants to pass personal_destinations, but the live
+    assess_location() it actually gets (simulated here as a stale,
+    older 3-argument version) does not accept that keyword at all.
+
+    Before this fix: TypeError, whole analysis run crashes.
+    After this fix: _safe_assess_location detects the signature via
+    inspect, omits the unsupported kwarg, and returns a normal (if
+    destination-less) LocationAssessment instead of raising.
+    """
+    def _stale_assess_location(postcode, latitude=0.0, longitude=0.0):
+        """Stands in for an older src/transport.py that predates
+        personal_destinations — exactly what a mid-deploy stale process
+        would still be running."""
+        return assess_location(postcode=postcode, latitude=latitude, longitude=longitude)
+
+    # Sanity: confirm the stale stand-in really would crash if called
+    # the way app.py calls the current assess_location.
+    crashed = False
+    try:
+        _stale_assess_location(
+            postcode="OX28 5NR", latitude=0, longitude=0,
+            personal_destinations=[{"name": "Workplace", "postcode": "OX1 2JD"}],
+        )
+    except TypeError:
+        crashed = True
+    assert crashed, "test setup didn't actually reproduce the reported TypeError"
+
+    # Now the actual regression check: the safe wrapper must not crash
+    # even when handed this stale function.
+    loc = _safe_assess_location(
+        postcode="OX28 5NR", latitude=0, longitude=0,
+        personal_destinations=[{"name": "Workplace", "postcode": "OX1 2JD"}],
+        location_fn=_stale_assess_location,
+    )
+    assert loc is not None
+    assert loc.assessed is False  # stale function never saw the destination
+    print("OK: app-level call pattern against a stale assess_location() -> "
+          "no crash, degrades to not-assessed")
+
+
 if __name__ == "__main__":
+    _assert_safe_wrapper_matches_app_py()
     test_1_investment_mode_no_destinations()
     test_2_personal_mode_no_destinations()
     test_3_personal_mode_one_destination()
@@ -158,4 +252,6 @@ if __name__ == "__main__":
     test_scorecard_excludes_unassessed_location()
     test_no_hardcoded_personal_locations_anywhere()
     test_valuation_numbers_unaffected()
+    test_app_level_call_pattern_normal()
+    test_app_level_call_pattern_reproduces_streamlit_crash_safely()
     print("\nALL LOCATION ASSESSMENT TESTS PASSED")

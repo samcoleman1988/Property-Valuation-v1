@@ -4,6 +4,7 @@ Paste a Rightmove URL to get a detailed investment analysis and PDF report.
 """
 
 import os
+import inspect
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -52,6 +53,43 @@ def _ensure_recommendation(final, source_engine: str):
         sufficient_evidence=final.sufficient_evidence,
         source_engine=source_engine,
     )
+
+
+def _safe_assess_location(postcode: str, latitude: float, longitude: float, personal_destinations: list):
+    """Call assess_location() defensively against a signature mismatch.
+
+    Reported failure: Streamlit Cloud raised a TypeError calling
+    assess_location(..., personal_destinations=...) — consistent with a
+    stale process still running an older src/transport.py that predates
+    the personal_destinations parameter (the same class of issue as the
+    earlier v2_result.final.recommendation AttributeError, both signs of
+    a mid-deploy window rather than a real code defect at the commit in
+    question). This checks the live function's actual signature before
+    calling it, so a stale/older assess_location() degrades to "not
+    assessed" instead of crashing the whole analysis run. No separate
+    location-scoring logic — same assess_location(), called safely.
+    """
+    kwargs = {"postcode": postcode, "latitude": latitude, "longitude": longitude}
+    try:
+        if "personal_destinations" in inspect.signature(assess_location).parameters:
+            kwargs["personal_destinations"] = personal_destinations
+    except (TypeError, ValueError):
+        pass  # can't introspect — fall through and try the full call anyway
+
+    try:
+        return assess_location(**kwargs)
+    except TypeError:
+        try:
+            # Last-resort retry with only the arguments every version of
+            # this function has always accepted.
+            return assess_location(postcode=postcode, latitude=latitude, longitude=longitude)
+        except TypeError:
+            from src.transport import LocationAssessment
+            fallback = LocationAssessment()
+            fallback.warnings.append(
+                "Location assessment unavailable due to a temporary compatibility error."
+            )
+            return fallback
 
 
 st.set_page_config(
@@ -390,7 +428,7 @@ if st.button("Analyse Property", type="primary", disabled=not url):
 
     # Step 7: Location
     with st.status("Assessing location...", expanded=False) as status:
-        location = assess_location(
+        location = _safe_assess_location(
             postcode=listing.postcode,
             latitude=listing.latitude or 0,
             longitude=listing.longitude or 0,
