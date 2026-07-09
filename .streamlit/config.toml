@@ -1,0 +1,10 @@
+[server]
+# Streamlit Cloud sets these itself; kept here so local runs behave the
+# same way (bind to all interfaces, standard port) if you ever want to
+# reach a locally-run instance from your phone over the same Wi-Fi.
+headless = true
+
+[theme]
+# Default Streamlit theme — safe, high-contrast, works fine on mobile.
+# Change here (not in code) if you want a different look later.
+base = "light"

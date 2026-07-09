@@ -1,0 +1,30 @@
+{
+  "version": "v2-evidence-status-fallback-guard",
+  "version_date": "2026-07-09",
+  "created_at": "2026-07-09T00:00:00",
+  "description": "V2 four-group evidence engine with Evidence Status classification (STRONG/WEAK/FALLBACK_ONLY/EMPTY) replacing the continuous Evidence Quality multiplier, plus the Development-affinity stopword fix, unknown-type diagnostic split, and the fallback-admission price-band guard (+/-50% of genuine median).",
+  "changes_in_this_version": [
+    "Evidence Status classification (STRONG/WEAK/FALLBACK_ONLY/EMPTY) drives group authority in blend_evidence(), replacing the EQ-as-multiplier approach",
+    "_development_affinity(): generic geographic/landmark stopwords (MILL, CHURCH, PARK, HOUSE, etc.) no longer create a false building/street name match on their own",
+    "Development affinity admission threshold raised from >=0.30 to >0.30, unless a strong signal is present (same postcode, estate name match, or building/block name match)",
+    "unknown_type_count added to EvidenceGroup — comps with an unrecorded Land Registry type code no longer inflate type_exact_count",
+    "_admit_fallback_comps(): incompatible-type comps admitted only when genuine (exact+compatible+unknown) evidence is thin (<3 comps), and only if their adjusted price is within +/-50% of the genuine median (when a genuine median exists)"
+  ],
+  "source_files": [
+    {
+      "path": "src/valuation_engine_v2.py",
+      "sha256": "27a84182e749bdf88a15880e56231b388642f8e4ac9208a43016cd9f9850a61e",
+      "snapshot": "baselines/v2-evidence-status-fallback-guard/valuation_engine_v2.py"
+    },
+    {
+      "path": "src/comparable_engine.py",
+      "sha256": "96e06171c7b47857cf8bac9fbb4f8554c25bfaec236c34c2034261ef2bcfdb3b",
+      "snapshot": "baselines/v2-evidence-status-fallback-guard/comparable_engine.py"
+    }
+  ],
+  "known_limitations": [
+    "This project is not a git repository, so this manifest + file snapshot is the only version record. If src/valuation_engine_v2.py or src/comparable_engine.py change, re-snapshot and bump MODEL_VERSION in valuation_engine_v2.py before treating a new validation run as comparable to this baseline.",
+    "Recency-dependent fields (age_days, HPI-adjusted prices) are computed against datetime.now() inside comparable_engine.py at fetch time, not against a single frozen 'as of' date passed through the pipeline. A validation run spanning multiple hours can see individual comparables silently cross the 3-year (Direct) or 5-year (Development) recency cutoff between the first and last property tested. This was observed directly in this baseline's source data (Vyner Road South and Willowbank Road both lost same-street comparables to recency drift between earlier and later runs on the same day). The validation script logs a per-property fetch timestamp so this is visible after the fact rather than silent.",
+    "A discrepancy exists between the postcodes used in this session's test scripts (test_es_batch_a.py / test_es_batch_b.py, used again for this baseline) and postcodes recorded in project memory 'test-properties' as corrected via direct Land Registry street-name queries (Ruttle Close: OX10 9QT here vs OX10 9FP in memory; Ingestre Road: CH43 5UX here vs CH43 5UY in memory; Chestnut Close: OX28 1GH here vs OX28 1PD in memory). This baseline uses the session-consistent postcodes for continuity with prior reports (EQ validation, Evidence Status validation, Mill Street forensic). This should be resolved before this baseline is treated as authoritative for those three properties."
+  ]
+}

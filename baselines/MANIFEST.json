@@ -1,0 +1,16 @@
+{
+  "baselines": [
+    {
+      "version": "v2-evidence-status-fallback-guard",
+      "version_date": "2026-07-09",
+      "path": "baselines/v2-evidence-status-fallback-guard/",
+      "current": false
+    },
+    {
+      "version": "v2-evidence-status-fallback-guard-real-hpi",
+      "version_date": "2026-07-09",
+      "path": "baselines/v2-evidence-status-fallback-guard-real-hpi/",
+      "current": true
+    }
+  ]
+}

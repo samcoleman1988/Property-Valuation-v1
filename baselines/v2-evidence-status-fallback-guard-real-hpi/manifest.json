@@ -1,0 +1,38 @@
+{
+  "version": "v2-evidence-status-fallback-guard-real-hpi",
+  "version_date": "2026-07-09",
+  "created_at": "2026-07-09T12:20:00",
+  "parent_version": "v2-evidence-status-fallback-guard",
+  "description": "Same V2 engine as v2-evidence-status-fallback-guard, with one fix: src/hpi.py's HPI CSV parser now correctly reads the Land Registry HPI download instead of silently failing. This is a VALUATION-CHANGING fix — comparable prices are now adjusted using real regional House Price Index data instead of the flat 3%/year fallback that every valuation had silently been using.",
+  "changes_in_this_version": [
+    "hpi.py _fetch_hpi_csv(): the parser checked for a 'Date' column that does not exist in the actual CSV (which has 'Period' and 'Pivotable date' instead) — every fetch silently returned None, and adjust_price_to_current() always fell back to flat 3%/year growth. Now uses 'Pivotable date' (falls back to 'Period' if absent).",
+    "hpi.py get_hpi_diagnostics(region): new read-only diagnostic function reporting whether real HPI data or the flat-rate fallback was used, and the latest HPI month available. Not consulted by any valuation calculation.",
+    "The flat-rate fallback (_adjust_with_flat_rate) is unchanged and still used automatically if the HPI fetch fails for any reason.",
+    "No changes to comparable selection, evidence weighting, confidence scoring, PDF generation, app UI, or the explanation engine."
+  ],
+  "source_files": [
+    {
+      "path": "src/valuation_engine_v2.py",
+      "sha256": "1629a2bf92fd1023e95e3333d88f72b256336ba8b9e1b1199d9295e57536b31b",
+      "snapshot": "baselines/v2-evidence-status-fallback-guard-real-hpi/valuation_engine_v2.py",
+      "note": "Only change from parent version: MODEL_VERSION constant bumped."
+    },
+    {
+      "path": "src/comparable_engine.py",
+      "sha256": "96e06171c7b47857cf8bac9fbb4f8554c25bfaec236c34c2034261ef2bcfdb3b",
+      "snapshot": "baselines/v2-evidence-status-fallback-guard-real-hpi/comparable_engine.py",
+      "note": "Unchanged from parent version (hash identical)."
+    },
+    {
+      "path": "src/hpi.py",
+      "sha256": "cd6d5ec01d4f404f0a6c8d799dacc94f521d8c5d859b686ecafb18a284651676",
+      "snapshot": "baselines/v2-evidence-status-fallback-guard-real-hpi/hpi.py",
+      "note": "Parser fix + diagnostics. This is the file that actually changes valuation output in this version."
+    }
+  ],
+  "known_limitations": [
+    "This project is not a git repository, so this manifest + file snapshot is the only version record.",
+    "Recency-dependent fields (age_days) are still computed against datetime.now() at fetch time — unchanged from the parent baseline. See that baseline's manifest for the recency-drift caveat, which still applies.",
+    "The postcode discrepancy against project memory 'test-properties' noted in the parent baseline's manifest has not been resolved here either — the same session-consistent postcodes are used for comparability."
+  ]
+}
