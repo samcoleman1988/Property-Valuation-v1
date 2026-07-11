@@ -61,10 +61,30 @@ These steps need your own GitHub and Streamlit Cloud accounts — they can't be 
    ```
    (same format as `.streamlit/secrets.toml.example` in this repo — that file is a template only, never a real key).
 5. Click **Deploy**. You'll get a URL like `https://<your-app>.streamlit.app` — open that on your phone and bookmark it or add it to your home screen.
+6. **Optional but recommended:** after each push, add the new commit hash (`git rev-parse HEAD`) to the same Secrets box:
+   ```toml
+   EPC_API_KEY = "your_base64_encoded_key_here"
+   DEPLOYED_COMMIT = "abc1234..."
+   ```
+   The sidebar's Deployment section reads this to confirm the running instance matches what you just pushed — see "Deployment reliability" below for why this exists.
 
 ### Keeping it updated
 
-Any `git push` to the connected branch triggers an automatic redeploy on Streamlit Cloud — no separate deploy step needed after the first one.
+Any `git push` to the connected branch triggers an automatic redeploy on Streamlit Cloud. In practice, though, a request has landed on a running instance mid-redeploy at least once (see "Deployment reliability" below) — follow the full workflow below for anything beyond a docs/wording-only change:
+
+1. **Push changes.**
+2. **Wait for Community Cloud to redeploy** (usually under a minute — the app briefly shows a "rebooting" indicator).
+3. **Reboot the app manually** after any change that touches a cross-module function signature or dataclass shape (not needed for pure wording/UI tweaks) — Streamlit Cloud's app menu (⋮) → "Reboot app". This forces a clean process restart rather than relying on the automatic redeploy alone.
+4. **Confirm the displayed version/commit** — sidebar → Deployment shows the app version, valuation baseline version, and (if you've set the `DEPLOYED_COMMIT` environment variable after this push) the commit hash. If it doesn't match what you just pushed, the redeploy hasn't landed yet — wait and recheck rather than assuming the code is live.
+5. **Run one smoke-test property** through the full flow (paste a URL, let it reach the PDF download button) before treating the deployment as live for real use.
+
+### Deployment reliability
+
+Streamlit Community Cloud redeploys by pulling the new commit into the running container and restarting the process — not an atomic swap. On 2026-07-09, a push that changed `app.py` and `src/transport.py` together in one commit was followed by a live `TypeError` consistent with `app.py`'s new code calling an older version of `assess_location()`. A full repo audit ruled out every structural cause available to check — no duplicate modules, no circular imports, no stale committed bytecode, no inconsistent commits (`app.py` and `transport.py` changed atomically, together, in the same commit). **The most likely explanation is a stale or partially refreshed cloud runtime at the moment of the request — the exact platform-side mechanism is unconfirmed, since the unredacted deployment logs weren't captured.**
+
+Two defensive wrappers in `app.py` (`_ensure_recommendation()`, `_safe_assess_location()`) guard the two integration points this has actually affected — they check the live function's real shape/signature before relying on it, and degrade gracefully instead of crashing the page if it's ever stale. These are kept permanently (the underlying platform behaviour isn't specific to one commit), but this pattern is deliberately **not** applied elsewhere in the codebase without an observed failure — see each function's docstring for the reasoning.
+
+The sidebar's **Deployment** section (app version, baseline version, and an optional `DEPLOYED_COMMIT` environment variable you can set after each push) exists so a mismatch like this is visible at a glance instead of only showing up as a crash.
 
 ### Data/cache handling on the hosted deployment
 

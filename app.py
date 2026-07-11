@@ -26,6 +26,7 @@ from src.report_generator import generate_report
 from src.epc import estimate_epc_impact, lookup_subject_floor_area, get_epc_key
 from src.property_db import save_property, get_all_properties
 from src.recommendation import build_recommendation
+from src.deployment_info import get_deployment_info
 from src.utils import format_currency, format_pct
 
 
@@ -59,14 +60,20 @@ def _safe_assess_location(postcode: str, latitude: float, longitude: float, pers
     """Call assess_location() defensively against a signature mismatch.
 
     Reported failure: Streamlit Cloud raised a TypeError calling
-    assess_location(..., personal_destinations=...) — consistent with a
-    stale process still running an older src/transport.py that predates
-    the personal_destinations parameter (the same class of issue as the
-    earlier v2_result.final.recommendation AttributeError, both signs of
-    a mid-deploy window rather than a real code defect at the commit in
-    question). This checks the live function's actual signature before
-    calling it, so a stale/older assess_location() degrades to "not
-    assessed" instead of crashing the whole analysis run. No separate
+    assess_location(..., personal_destinations=...) shortly after a push
+    that added that parameter. A repo-level audit ruled out duplicate
+    modules, circular imports, stale committed bytecode, and inconsistent
+    commits — app.py and transport.py changed together, atomically, in
+    the same commit. The most likely explanation is a stale or partially
+    refreshed cloud runtime at the moment of the request; the exact
+    platform-side mechanism is unconfirmed (the unredacted deployment
+    logs weren't captured). See the same reasoning on
+    _ensure_recommendation() above, which guards the equivalent failure
+    mode for V1/V2 result objects.
+
+    This checks the live function's actual signature before calling it,
+    so a stale/older assess_location() degrades to "not assessed"
+    instead of crashing the whole analysis run. No separate
     location-scoring logic — same assess_location(), called safely.
     """
     kwargs = {"postcode": postcode, "latitude": latitude, "longitude": longitude}
@@ -216,6 +223,17 @@ with st.sidebar:
             st.caption(label)
     else:
         st.caption("No saved properties yet.")
+
+    st.divider()
+    st.subheader("Deployment")
+    st.caption(
+        "Confirms which release this instance is actually serving — check this "
+        "after a push before treating the deployment as live."
+    )
+    _deploy_info = get_deployment_info()
+    st.caption(f"App version: **{_deploy_info['app_version']}**")
+    st.caption(f"Baseline: **{_deploy_info['baseline_version']}** ({_deploy_info['baseline_version_date']})")
+    st.caption(f"Deployed commit: **{_deploy_info['deployed_commit']}**")
 
 # --- Main: URL Input ---
 url = st.text_input(
