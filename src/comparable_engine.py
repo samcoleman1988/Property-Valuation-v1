@@ -198,6 +198,18 @@ def fetch_and_score_comparables(
         evidence.evidence_summary = "No evidence available"
         return evidence
 
+    # Pre-warm the geocode cache for every unique comparable postcode before
+    # the per-comparable loop below. This does not change which postcodes
+    # get geocoded, the distance formula, or any output — it only avoids a
+    # sequential network round-trip per comparable on a cold cache. The
+    # per-comparable loop's call to _estimate_distance_from_postcode() is
+    # completely unchanged; it will simply find the cache already warm.
+    if latitude and longitude:
+        unique_postcodes = {rec.get("postcode", "") for rec in raw_records if rec.get("postcode")}
+        if unique_postcodes:
+            from .transport import geocode_postcodes_batch
+            geocode_postcodes_batch(unique_postcodes)
+
     # Build comparable objects and calculate distance/age
     all_comps = []
     for rec in raw_records:

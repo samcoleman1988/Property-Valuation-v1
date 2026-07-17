@@ -16,6 +16,7 @@ assessed" for "assessed as average" (a numeric placeholder like 5/10
 would look exactly like a real, if mediocre, score).
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
@@ -122,6 +123,52 @@ def geocode_postcode(postcode: str) -> Optional[tuple]:
     except (requests.RequestException, ValueError, KeyError):
         pass
     return None
+
+
+_GEOCODE_BATCH_MAX_WORKERS = 5
+
+
+def geocode_postcodes_batch(
+    postcodes, max_workers: int = _GEOCODE_BATCH_MAX_WORKERS
+) -> dict:
+    """Geocode many postcodes efficiently: dedupe, read the disk cache for
+    every postcode first (cheap, synchronous, no network), then fetch only
+    genuine cache misses concurrently via a conservative thread pool.
+
+    Each postcode still resolves through geocode_postcode() unchanged —
+    same cache key, same 1-year TTL, same timeout and error handling — so
+    every returned coordinate is identical to what a sequential call to
+    geocode_postcode() would have produced. This function only changes how
+    many network round-trips a cold cache costs, not what gets geocoded or
+    what the result is. See ROADMAP.md (geocoding dedupe/batching,
+    identified as a measured operational bottleneck, not a theoretical one).
+
+    Returns {postcode: (lat, lon) | None}. Postcodes that are falsy/empty
+    are skipped entirely (never appear in the result).
+    """
+    unique = sorted({pc for pc in postcodes if pc})
+    results: dict = {}
+    misses = []
+
+    for pc in unique:
+        ck = cache_key("geo", {"pc": pc})
+        cached = get_cached(ck, max_age_hours=8760)
+        if cached and "lat" in cached:
+            results[pc] = (cached["lat"], cached["lon"])
+        else:
+            misses.append(pc)
+
+    if misses:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_pc = {executor.submit(geocode_postcode, pc): pc for pc in misses}
+            for future in future_to_pc:
+                pc = future_to_pc[future]
+                try:
+                    results[pc] = future.result()
+                except Exception:
+                    results[pc] = None
+
+    return results
 
 
 def _estimate_drive_time(distance_miles: float) -> str:

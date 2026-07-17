@@ -35,53 +35,175 @@ from src.epc import lookup_subject_floor_area
 from src.hpi import get_hpi_diagnostics
 from src.utils import format_currency
 
-# --- Fixed 20-property validation set -------------------------------------
-# Same properties/postcodes used throughout this session's EQ and Evidence
-# Status validation runs, kept identical here for cross-run comparability.
-# See baselines/v2-evidence-status-fallback-guard/manifest.json for a known
-# postcode discrepancy against project memory that has NOT been applied here.
+# --- Validation set --------------------------------------------------------
+# Properties 1-20: the original fixed set used throughout this session's EQ
+# and Evidence Status validation runs, kept identical here for cross-run
+# comparability. See baselines/v2-evidence-status-fallback-guard/manifest.json
+# for a known postcode discrepancy against project memory that has NOT been
+# applied here.
+#
+# Properties 21-37: added under ROADMAP.md item 2 (validation dataset
+# expansion). Every one of these was sourced from a live Rightmove listing
+# fetched directly (WebSearch + WebFetch) during that session — postcode,
+# price, type, and bedroom count are as shown on the listing at the time it
+# was captured, not invented. "url", "why_selected", and "expected_challenge"
+# are populated only for 21-37; the original 20 predate this metadata and are
+# left blank rather than backfilled with speculative reasoning.
+#
+# This is a REGRESSION/EVALUATION set, not a training set — once added,
+# entries should stay stable across runs rather than be swapped out, per
+# ROADMAP.md item 2's validation philosophy.
 
 PROPERTIES = [
     {"n": 1, "label": "Ruttle Close, Cholsey", "postcode": "OX10 9QT",
-     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 425000, "street": "Ruttle Close"},
+     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 425000, "street": "Ruttle Close",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 2, "label": "Chestnut Close, Witney", "postcode": "OX28 1GH",
-     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 425000, "street": "Chestnut Close"},
+     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 425000, "street": "Chestnut Close",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 3, "label": "Thorney Leys, Witney", "postcode": "OX28 5NR",
-     "type": "Terraced", "beds": 3, "tenure": "Freehold", "asking": 275000, "street": "Thorney Leys"},
+     "type": "Terraced", "beds": 3, "tenure": "Freehold", "asking": 275000, "street": "Thorney Leys",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 4, "label": "Ingestre Road, Prenton", "postcode": "CH43 5UX",
-     "type": "Flat", "beds": 2, "tenure": "Leasehold", "asking": 160000, "street": "Ingestre Road"},
+     "type": "Flat", "beds": 2, "tenure": "Leasehold", "asking": 160000, "street": "Ingestre Road",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 5, "label": "Vyner Road South, Prenton", "postcode": "CH43 7PN",
-     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 230000, "street": "Vyner Road South"},
+     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 230000, "street": "Vyner Road South",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 6, "label": "Willowbank Road, Birkenhead", "postcode": "CH42 7JZ",
-     "type": "Terraced", "beds": 2, "tenure": "Freehold", "asking": 120000, "street": "Willowbank Road"},
+     "type": "Terraced", "beds": 2, "tenure": "Freehold", "asking": 120000, "street": "Willowbank Road",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 7, "label": "Magazine Lane, New Brighton", "postcode": "CH45 1HW",
-     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 185000, "street": "Magazine Lane"},
+     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 185000, "street": "Magazine Lane",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 8, "label": "Dee Park Road, Heswall", "postcode": "CH60 0BL",
-     "type": "Detached House", "beds": 4, "tenure": "Freehold", "asking": 550000, "street": "Dee Park Road"},
+     "type": "Detached House", "beds": 4, "tenure": "Freehold", "asking": 550000, "street": "Dee Park Road",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 9, "label": "Acacia Grove, Bebington", "postcode": "CH63 2HR",
-     "type": "Bungalow", "beds": 2, "tenure": "Freehold", "asking": 295000, "street": "Acacia Grove"},
+     "type": "Bungalow", "beds": 2, "tenure": "Freehold", "asking": 295000, "street": "Acacia Grove",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 10, "label": "Headley Way, Oxford", "postcode": "OX3 7SU",
-     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 550000, "street": "Headley Way"},
+     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 550000, "street": "Headley Way",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 11, "label": "Saxton Road, Abingdon", "postcode": "OX14 5LN",
-     "type": "Terraced", "beds": 2, "tenure": "Freehold", "asking": 275000, "street": "Saxton Road"},
+     "type": "Terraced", "beds": 2, "tenure": "Freehold", "asking": 275000, "street": "Saxton Road",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 12, "label": "Mereland Road, Didcot", "postcode": "OX11 8AZ",
-     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 310000, "street": "Mereland Road"},
+     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 310000, "street": "Mereland Road",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 13, "label": "Witan Way, Witney", "postcode": "OX28 6FH",
-     "type": "Flat", "beds": 1, "tenure": "Leasehold", "asking": 160000, "street": "Witan Way"},
+     "type": "Flat", "beds": 1, "tenure": "Leasehold", "asking": 160000, "street": "Witan Way",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 14, "label": "High Street, Wallingford", "postcode": "OX10 0BX",
-     "type": "Terraced", "beds": 3, "tenure": "Freehold", "asking": 375000, "street": "High Street"},
+     "type": "Terraced", "beds": 3, "tenure": "Freehold", "asking": 375000, "street": "High Street",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 15, "label": "Bostock Road, Abingdon", "postcode": "OX14 1DT",
-     "type": "Detached House", "beds": 4, "tenure": "Freehold", "asking": 475000, "street": "Bostock Road"},
+     "type": "Detached House", "beds": 4, "tenure": "Freehold", "asking": 475000, "street": "Bostock Road",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 16, "label": "Mill Street, Eynsham", "postcode": "OX29 4JX",
-     "type": "Terraced", "beds": 2, "tenure": "Freehold", "asking": 350000, "street": "Mill Street"},
+     "type": "Terraced", "beds": 2, "tenure": "Freehold", "asking": 350000, "street": "Mill Street",
+     "url": "", "why_selected": "", "expected_challenge": "Known false-affinity risk (Mill Street / THE MILL HOUSE) — see ROADMAP/session history."},
     {"n": 17, "label": "Monks Close, Carterton", "postcode": "OX18 3RF",
-     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 265000, "street": "Monks Close"},
+     "type": "Semi-Detached", "beds": 3, "tenure": "Freehold", "asking": 265000, "street": "Monks Close",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 18, "label": "Bracken Close, Didcot", "postcode": "OX11 7TG",
-     "type": "Detached House", "beds": 3, "tenure": "Freehold", "asking": 340000, "street": "Bracken Close"},
+     "type": "Detached House", "beds": 3, "tenure": "Freehold", "asking": 340000, "street": "Bracken Close",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 19, "label": "Yewdale Park, Prenton", "postcode": "CH43 5YQ",
-     "type": "Flat", "beds": 2, "tenure": "Leasehold", "asking": 130000, "street": "Yewdale Park"},
+     "type": "Flat", "beds": 2, "tenure": "Leasehold", "asking": 130000, "street": "Yewdale Park",
+     "url": "", "why_selected": "", "expected_challenge": ""},
     {"n": 20, "label": "Ladygrove, Didcot", "postcode": "OX11 7UG",
-     "type": "Terraced", "beds": 3, "tenure": "Freehold", "asking": 295000, "street": "Ladygrove"},
+     "type": "Terraced", "beds": 3, "tenure": "Freehold", "asking": 295000, "street": "Ladygrove",
+     "url": "", "why_selected": "", "expected_challenge": ""},
+
+    # --- Expansion batch (ROADMAP.md item 2), sourced live 2026-07 ---
+    {"n": 21, "label": "Tuckers Court, Richmond Villages, Witney", "postcode": "OX28 5DG",
+     "type": "Flat", "beds": 2, "tenure": "Leasehold", "asking": 470000, "street": "Coral Springs Way",
+     "url": "https://www.rightmove.co.uk/properties/168396455",
+     "why_selected": "Age-restricted retirement development — very distinct market segment from ordinary flats.",
+     "expected_challenge": "Retirement/age-restricted leasehold flat; comparables likely confined to the same development (sparse, high-affinity Estate Evidence test)."},
+    {"n": 22, "label": "Coral Springs Way, Richmond Villages, Witney", "postcode": "OX28 5DG",
+     "type": "Flat", "beds": 1, "tenure": "Leasehold", "asking": 325000, "street": "Coral Springs Way",
+     "url": "https://www.rightmove.co.uk/properties/167852555",
+     "why_selected": "Smallest/cheapest unit in the same retirement development as #21 — tests within-development price spread.",
+     "expected_challenge": "1-bed retirement leasehold flat; sparse comparables outside the development itself."},
+    {"n": 23, "label": "Woodford Mill, Mill Street, Witney", "postcode": "OX28 6DE",
+     "type": "Flat", "beds": 2, "tenure": "", "asking": 270000, "street": "Mill Street",
+     "url": "https://www.rightmove.co.uk/properties/169495439",
+     "why_selected": "Converted mill building flat; tenure not stated on the listing — realistic data-gap case.",
+     "expected_challenge": "Tenure unknown/unconfirmed at capture time; converted-building flat, floor area may be atypical."},
+    {"n": 24, "label": "Lady Grove Road, Didcot", "postcode": "OX11 9BP",
+     "type": "Semi-Detached", "beds": 4, "tenure": "", "asking": 499995, "street": "Lady Grove Road",
+     "url": "https://www.rightmove.co.uk/properties/174812675",
+     "why_selected": "Established estate with multiple concurrent listings on the same road (see #26 too) — good same-estate density test.",
+     "expected_challenge": "Estate/development affinity — several same-road listings should mutually reinforce Estate Evidence once sold."},
+    {"n": 25, "label": "Willington Down, Lady Grove, Didcot", "postcode": "OX11 9GG",
+     "type": "Semi-Detached", "beds": 3, "tenure": "", "asking": 490000, "street": "Willington Down",
+     "url": "https://www.rightmove.co.uk/properties/89462538",
+     "why_selected": "Adjacent close within the same wider Lady Grove estate as #24.",
+     "expected_challenge": "Tests whether Estate Evidence correctly links closely-related but differently-named streets within one development."},
+    {"n": 26, "label": "Valley Park, Didcot", "postcode": "OX11 6LB",
+     "type": "Semi-Detached", "beds": 4, "tenure": "", "asking": 459995, "street": "Valley Park",
+     "url": "https://www.rightmove.co.uk/properties/88652370",
+     "why_selected": "Newer-build estate, different part of Didcot from the Ladygrove/Lady Grove cluster.",
+     "expected_challenge": "New-build-adjacent estate; existing hard gate excludes genuine new-build comparables, so evidence may be thinner than expected for a large estate."},
+    {"n": 27, "label": "Ladygrove, Didcot", "postcode": "OX11 9BS",
+     "type": "Semi-Detached", "beds": 4, "tenure": "", "asking": 450000, "street": "Ladygrove",
+     "url": "https://www.rightmove.co.uk/properties/88952205",
+     "why_selected": "Shares a street name with existing property #20 (Ladygrove, Didcot) but is a distinct address/price point — tests whether the two are correctly NOT conflated.",
+     "expected_challenge": "Same street name as an existing validation entry — false-duplication / affinity risk analogous to the Mill Street case (#16)."},
+    {"n": 28, "label": "Arundel Avenue, Aigburth, Liverpool", "postcode": "L17 2AU",
+     "type": "Terraced", "beds": 7, "tenure": "", "asking": 330000, "street": "Arundel Avenue",
+     "url": "https://www.rightmove.co.uk/properties/90724686",
+     "why_selected": "Unusually high bedroom count for a terraced house — likely a converted/extended property.",
+     "expected_challenge": "Unusual layout — 7-bed terrace may be an HMO-style conversion; floor area and £/bedroom will be atypical vs standard 3-bed terrace comparables."},
+    {"n": 29, "label": "Alwyn Street, Aigburth, Liverpool", "postcode": "L17 7DY",
+     "type": "Terraced", "beds": 4, "tenure": "Freehold", "asking": 270000, "street": "Alwyn Street",
+     "url": "https://www.rightmove.co.uk/properties/90653370",
+     "why_selected": "Dense inner-urban terraced street — expected to have plentiful genuine comparables, a useful contrast to the sparse-evidence cases in this set.",
+     "expected_challenge": "Low expected challenge — control case for a well-evidenced urban terrace."},
+    {"n": 30, "label": "Egerton Park, Birkenhead", "postcode": "CH42 4RB",
+     "type": "Flat", "beds": 0, "tenure": "", "asking": 250000, "street": "Egerton Park",
+     "url": "https://www.rightmove.co.uk/properties/87857151",
+     "why_selected": "Part of a block of apartments; bedroom count and tenure were not stated on the listing at capture time.",
+     "expected_challenge": "Missing bedroom count and tenure — tests engine behaviour with incomplete subject-property data."},
+    {"n": 31, "label": "Woodchurch Lane, Birkenhead", "postcode": "CH42 9PD",
+     "type": "Flat", "beds": 0, "tenure": "", "asking": 215000, "street": "Woodchurch Lane",
+     "url": "https://www.rightmove.co.uk/properties/90088653",
+     "why_selected": "Entry-level flat, block-of-apartments listing with no bedroom count stated.",
+     "expected_challenge": "Missing bedroom count; entry-level price band for the North West portfolio area."},
+    {"n": 32, "label": "Grove Road, Birkenhead", "postcode": "CH42 3XT",
+     "type": "Flat", "beds": 5, "tenure": "", "asking": 165000, "street": "Grove Road",
+     "url": "https://www.rightmove.co.uk/properties/89971422",
+     "why_selected": "Very low asking price for a 5-bed listing — plausible multi-unit/investment-block sale, not a typical owner-occupier flat.",
+     "expected_challenge": "Price/bedroom mismatch suggests a non-standard transaction type; good stress test for whether the engine (or the not-yet-implemented PPD Category filter, ROADMAP item 4) would flag this as atypical."},
+    {"n": 33, "label": "Market Place, Faringdon", "postcode": "SN7 7HU",
+     "type": "Detached House", "beds": 6, "tenure": "Freehold", "asking": 3000000, "street": "Market Place",
+     "url": "https://www.rightmove.co.uk/properties/88645374",
+     "why_selected": "Extreme premium price point in a small market town centre — deliberately stresses the top end of the price range.",
+     "expected_challenge": "Sparse comparables expected at this price point; town-centre premium road; genuinely obvious high-price outlier vs local market."},
+    {"n": 34, "label": "Arbor Park, Bodicote, Banbury", "postcode": "OX15 4BN",
+     "type": "Terraced", "beds": 4, "tenure": "", "asking": 565000, "street": "Arbor Park",
+     "url": "https://www.rightmove.co.uk/properties/90802227",
+     "why_selected": "Village-edge new-ish estate near Banbury, multiple concurrent listings on the same close (see #35).",
+     "expected_challenge": "Village location; estate/development affinity test alongside #35."},
+    {"n": 35, "label": "Arbor Park, Bodicote, Banbury (End of Terrace)", "postcode": "OX15 4BN",
+     "type": "Terraced", "beds": 3, "tenure": "", "asking": 520000, "street": "Arbor Park",
+     "url": "https://www.rightmove.co.uk/properties/90808311",
+     "why_selected": "Same close as #34 but smaller/cheaper — tests within-estate price differentiation.",
+     "expected_challenge": "Same street as #34 — must NOT simply average the two together; genuinely different size/price point."},
+    {"n": 36, "label": "Wykham Lane, Banbury", "postcode": "OX16 9UN",
+     "type": "Terraced", "beds": 4, "tenure": "", "asking": 540000, "street": "Wykham Lane",
+     "url": "https://www.rightmove.co.uk/properties/89842665",
+     "why_selected": "Town-edge estate development, Banbury — geographic diversity away from the existing Didcot/Witney/Oxford cluster.",
+     "expected_challenge": "Newer estate; genuine same-street comparables may be limited if the development is recent."},
+    {"n": 37, "label": "Pipers Close, Heswall, Wirral", "postcode": "CH60 7RE",
+     "type": "Bungalow", "beds": 5, "tenure": "Freehold", "asking": 850000, "street": "Pipers Close",
+     "url": "https://www.rightmove.co.uk/properties/89508468",
+     "why_selected": "Agent's own listing explicitly flags 'extension potential' — direct test case for the extension-potential/planning module.",
+     "expected_challenge": "Premium detached bungalow with agent-claimed extension potential; tests whether planning.py's scoring is directionally consistent with a real agent's own assessment. "
+                            "NOTE: original run (n=37 in the 2026-07-15 baseline CSV/JSON) produced an untrustworthy 0.0s/£0 result — see "
+                            "validation_baselines/property_37_reruns/README.md for the corrected isolated re-run (£199,700 V2, Medium confidence)."},
 ]
 
 GROUP_KEYS = ["Direct Evidence", "Development Evidence", "Local Market Evidence", "Area Market Evidence"]
@@ -123,6 +245,9 @@ def run_one(p: dict) -> dict:
         "property_type": p["type"],
         "bedrooms": p["beds"],
         "asking_price": p["asking"],
+        "url": p.get("url", ""),
+        "why_selected": p.get("why_selected", ""),
+        "expected_challenge": p.get("expected_challenge", ""),
         "fetch_timestamp": fetch_ts,
         "elapsed_seconds": None,
         "v1_value": None,
@@ -221,7 +346,7 @@ def main():
 
     rows = []
     for p in PROPERTIES:
-        print(f"[{p['n']}/20] {p['label']} ({p['postcode']})...", flush=True)
+        print(f"[{p['n']}/{len(PROPERTIES)}] {p['label']} ({p['postcode']})...", flush=True)
         row = run_one(p)
         rows.append(row)
         if row["error"]:
@@ -247,6 +372,15 @@ def main():
         if cj:
             credibility_totals[cj] = credibility_totals.get(cj, 0) + 1
 
+    confidence_totals = {}
+    for row in rows:
+        cl = row.get("v2_confidence_label")
+        if cl:
+            confidence_totals[cl] = confidence_totals.get(cl, 0) + 1
+
+    elapsed_values = [r["elapsed_seconds"] for r in rows if r.get("elapsed_seconds") is not None]
+    avg_runtime = round(sum(elapsed_values) / len(elapsed_values), 1) if elapsed_values else 0
+
     meta = {
         "model_version": MODEL_VERSION,
         "model_version_date": MODEL_VERSION_DATE,
@@ -259,6 +393,8 @@ def main():
         "properties_failed": n_errors,
         "evidence_status_totals": {str(k): v for k, v in status_totals.items() if k is not None},
         "credibility_judgement_totals": credibility_totals,
+        "confidence_label_totals": confidence_totals,
+        "average_runtime_seconds_per_property": avg_runtime,
         "note_on_valuation_date": (
             "Each property's comparable age (age_days) and HPI-adjusted prices "
             "are computed against datetime.now() inside comparable_engine.py at "
@@ -290,9 +426,10 @@ def main():
     print(f"HPI source:    {meta['hpi_diagnostics']}", flush=True)
     print(f"Run started:   {run_started_at.isoformat()}", flush=True)
     print(f"Run finished:  {run_finished_at.isoformat()}", flush=True)
-    print(f"Duration:      {meta['run_duration_seconds']}s", flush=True)
+    print(f"Duration:      {meta['run_duration_seconds']}s  (avg {avg_runtime}s/property)", flush=True)
     print(f"Properties:    {n_ok} succeeded, {n_errors} failed (of {len(PROPERTIES)})", flush=True)
     print(f"Evidence status totals: {meta['evidence_status_totals']}", flush=True)
+    print(f"Confidence totals:      {confidence_totals}", flush=True)
     print(f"Credibility totals:     {credibility_totals}", flush=True)
     print(f"CSV:  {csv_path}", flush=True)
     print(f"JSON: {json_path}", flush=True)

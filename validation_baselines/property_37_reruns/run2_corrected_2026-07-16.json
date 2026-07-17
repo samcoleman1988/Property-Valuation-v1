@@ -1,0 +1,21 @@
+{
+  "n": 37,
+  "property": "Pipers Close, Heswall, Wirral",
+  "postcode": "CH60 7RE",
+  "property_type": "Bungalow",
+  "bedrooms": 5,
+  "asking_price": 850000,
+  "run_context": "Isolated re-run after geocoding dedupe/batching fix (ROADMAP.md item 2 interim fix)",
+  "run_date": "2026-07-16",
+  "elapsed_seconds": 194.5,
+  "total_fetched": 216,
+  "total_scored": 49,
+  "v1_value": 300000.0,
+  "v2_value": 199700.0,
+  "v2_confidence_label": "Medium",
+  "v2_confidence_score": 47,
+  "v2_valuation_status": "Usable with caution",
+  "warnings": ["EPC floor area matched for 43/49 comparables"],
+  "supersedes": "Original run n=37 in 20260715_194932_baseline_..._item2-expansion-37.csv/.json (v1_value=0, v2_value=0, elapsed=0.0s, flagged untrustworthy)",
+  "note": "Large gap between asking price and V2 fair value not investigated in this pass -- see README.md in this directory."
+}
