@@ -204,6 +204,45 @@ PROPERTIES = [
      "expected_challenge": "Premium detached bungalow with agent-claimed extension potential; tests whether planning.py's scoring is directionally consistent with a real agent's own assessment. "
                             "NOTE: original run (n=37 in the 2026-07-15 baseline CSV/JSON) produced an untrustworthy 0.0s/£0 result — see "
                             "validation_baselines/property_37_reruns/README.md for the corrected isolated re-run (£199,700 V2, Medium confidence)."},
+
+    # --- Second expansion batch (ROADMAP.md item 2, resumed 2026-07-17),
+    # sourced live from Rightmove — targets the coverage gaps identified in
+    # the first batch: confirmed leasehold, genuinely new UK regions.
+    {"n": 38, "label": "The Vincent, Redland Hill, Bristol", "postcode": "BS6 6BJ",
+     "type": "Flat", "beds": 3, "tenure": "Leasehold", "asking": 895000, "street": "Redland Hill",
+     "url": "https://www.rightmove.co.uk/properties/90573426",
+     "why_selected": "Genuinely new UK region (South West, first Bristol entry in the dataset) and a CONFIRMED-tenure retirement leasehold flat — closes the confirmed-leasehold coverage gap flagged after the first batch.",
+     "expected_challenge": "Retirement/age-restricted leasehold development; premium South West market with no existing comparable-region coverage in this dataset."},
+    {"n": 39, "label": "Clifton, Bristol", "postcode": "BS8 3HX",
+     "type": "Flat", "beds": 3, "tenure": "", "asking": 950000, "street": "Clifton",
+     "url": "https://www.rightmove.co.uk/properties/90211176",
+     "why_selected": "Premium Bristol (Clifton) flat — new region, high price band, tenure unconfirmed at capture (realistic data-gap case).",
+     "expected_challenge": "Premium South West urban flat; tenure not stated on listing."},
+    {"n": 40, "label": "29 Victoria, Hudson Quarter, York", "postcode": "YO1 6AB",
+     "type": "Flat", "beds": 2, "tenure": "", "asking": 500000, "street": "Hudson Quarter",
+     "url": "https://www.rightmove.co.uk/properties/159972281",
+     "why_selected": "Genuinely new UK region (Yorkshire, first York entry) — new-build city-centre development, multiple concurrent listings on the same development (see #41, #43).",
+     "expected_challenge": "New-build-adjacent development; Yorkshire region with no existing comparable-region coverage."},
+    {"n": 41, "label": "15 Kings, Hudson Quarter, York", "postcode": "YO1 6AE",
+     "type": "Flat", "beds": 2, "tenure": "", "asking": 495000, "street": "Hudson Quarter",
+     "url": "https://www.rightmove.co.uk/properties/134214602",
+     "why_selected": "Same development as #40 but a different block (Kings, not Victoria) — tests within-development block-level differentiation.",
+     "expected_challenge": "Same development as #40 — must not simply average the two blocks together."},
+    {"n": 42, "label": "The Residence, Bishopthorpe Road, York", "postcode": "YO23 1DQ",
+     "type": "Flat", "beds": 2, "tenure": "", "asking": 400000, "street": "Bishopthorpe Road",
+     "url": "https://www.rightmove.co.uk/properties/90313569",
+     "why_selected": "Geographically distinct from the Hudson Quarter cluster (#40/#41/#43) within the same city — tests whether the engine correctly keeps genuinely separate York developments apart.",
+     "expected_challenge": "Same city, different development — a within-region differentiation test rather than a cross-region one."},
+    {"n": 43, "label": "18 Victoria, Hudson Quarter, York", "postcode": "YO1 6HP",
+     "type": "Flat", "beds": 2, "tenure": "", "asking": 375000, "street": "Hudson Quarter",
+     "url": "https://www.rightmove.co.uk/properties/89434272",
+     "why_selected": "Third Hudson Quarter listing (Victoria block again, different unit/price than #40) — deepens the same-development comparable density for a York new-build case.",
+     "expected_challenge": "Same development/block as #40 at a different price point — within-block price differentiation test."},
+    {"n": 44, "label": "Ethelbert Road, Canterbury", "postcode": "CT1 3ND",
+     "type": "Detached House", "beds": 6, "tenure": "", "asking": 1375000, "street": "Ethelbert Road",
+     "url": "https://www.rightmove.co.uk/properties/173317916",
+     "why_selected": "Genuinely new UK region (South East/Kent, first Canterbury entry) — premium detached property, large bedroom count.",
+     "expected_challenge": "Premium South East market with no existing comparable-region coverage in this dataset; large 6-bed detached, sparse comparables plausible."},
 ]
 
 GROUP_KEYS = ["Direct Evidence", "Development Evidence", "Local Market Evidence", "Area Market Evidence"]
