@@ -15,9 +15,11 @@ record only.
 ## Implementation Order (agreed, final)
 
 1. ~~Outcome tracking infrastructure~~ — **Done.** `outcome_tracking` table + capture wired into app.py.
-2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 37/~100.** Paused mid-expansion to fix a bottleneck the larger run itself exposed (see interim item below) — not abandoned, not complete.
-   - **Geocoding dedupe/batching — Done.** Elevated ahead of Planning API caching as an interim performance prerequisite, justified by quantitative evidence from the 37-property run itself (see "Roadmap Exception" note below). Fixed in `src/transport.py` (`geocode_postcodes_batch()`) and `src/comparable_engine.py`. Validated: 4-property cold-cache benchmark showed 3.4-6.6x speedup, 0 mismatches against sequential results, 100% warm-cache hit rate on re-run. See item 2 detail section below for full numbers.
-3. Planning API caching — next scheduled item, resumes once dataset expansion (item 2) is complete.
+2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 37/~100, pause LIFTED (2026-07-17).**
+   - **Geocoding dedupe/batching — Done, committed (`68b614b`), pushed.** Fixed in `src/transport.py` (`geocode_postcodes_batch()`) and `src/comparable_engine.py`. Validated: 4-property cold-cache benchmark showed 3.4-6.6x speedup, 0 mismatches against sequential results, 100% warm-cache hit rate on re-run.
+   - **Local Market property-type weighting — Done.** The systemic finding that paused this item (9/37 = 24% of properties affected by Local Market admitting mixed property types without discounting them, unlike Direct/Development) has been fixed, forensically validated (full per-group trace on two focus cases, 37/37 properties re-run before/after with zero unexplained movement), approved, and promoted as baseline `v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting`. See that baseline's `manifest.json` and `validation_baselines/forensic_reports/` for full detail. **Dataset expansion pause is lifted — resuming toward ~100.**
+   - One finding from this investigation was deliberately *not* fixed and is carried forward as a new future item — see "Development Evidence Robustness" below.
+3. Planning API caching — next scheduled item, resumes once dataset expansion (item 2) reaches ~100.
 4. **PPD Category filtering** (moved ahead of explainability — see rationale below)
 5. Explainability / retrieval transparency (wording, retrieval-state reporting, evidence provenance)
 6. Leasehold discovery
@@ -179,31 +181,70 @@ the dataset's audit trail; the corrected run is a separate, versioned entry
 per the "never silently overwrite a prediction" principle established in
 item 1.
 
-**Property #27 (Ladygrove, Didcot, OX11 9BS)** produced a genuine,
-forensically-investigated valuation anomaly (V2 = £1,415,700 vs £450,000
-asking, +214.6% gap). Full breakdown at
-`validation_baselines/forensic_reports/property_27_ladygrove_didcot.md`.
-**Root cause: Local Market Evidence admits Detached/Terraced comparables as
-"compatible" type but — unlike Direct and Development Evidence — applies no
-`property_type_weight()` discount to them**, letting 177 Detached
-comparables (46.6% of the group, many large rural properties with no
-recorded floor area) drag the group's weighted mean to £560,300 against a
-Semi-Detached subject. Secondary factor: the OX11 9 postcode sector spans
-both the subject's residential estate and outlying village centres, too
-coarse a geographic proxy on its own. No valuation logic was changed as a
-result of this investigation — flagged as a candidate fix for item 11
-(weight/profile tuning) in a future implementation pass, not fixed now.
+**Property #27 (Ladygrove, Didcot, OX11 9BS) — FIXED (partially).** The root
+cause identified during investigation — Local Market Evidence admitting
+Detached/Terraced comparables as "compatible" type without applying
+`property_type_weight()`, unlike Direct and Development Evidence — has been
+fixed and promoted as baseline
+`v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting`. This
+property's Local Market valuation corrected from £560,800 to £470,700
+(-16.1%, matching the forensic counterfactual almost exactly). **The
+property's headline anomaly is only partially resolved**, however: its
+final V2 figure barely moved (£1,415,600 → £1,385,600, -2.1%) because
+Development Evidence — untouched by this fix, and itself carrying its own
+unresolved thin-evidence problem — dominates this property's blend at ~67%
+weight. See "Development Evidence Robustness" below for the follow-on item
+this exposed.
+
+**Local Market property-type weighting fix — DONE, baseline promoted.**
+Systemic scan confirmed the pattern affected 9/37 properties (24%), not
+just Ladygrove. Full forensic audit, counterfactual analysis, before/after
+validation on all 37 properties, and reviewer-level movement classification
+in `validation_baselines/forensic_reports/stage2_local_market_type_weighting_audit.md`.
+Baseline: `baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting/manifest.json`.
 
 **Interim performance blocker discovered and fixed**: see "Roadmap
 Exception" above and "Geocoding Fix Validation" below — the geocoding
 dedupe/batching fix was implemented and validated before dataset expansion
-resumes, since continuing to add properties at the pre-fix cost (median
-65.9s/property, several 15-25 minute properties) would have made completing
-this item impractical.
+resumed.
 
-**Next step**: resume sourcing toward ~100, prioritising bungalows,
-confirmed-leasehold flats, and a genuinely new region, now that per-property
-cold-cache cost has been reduced.
+**Pause lifted (2026-07-17)**: both findings that paused this item are now
+resolved — see above. Resuming sourcing toward ~100, prioritising bungalows,
+confirmed-leasehold flats, a genuinely new UK region, unusual property
+types, sparse-comparable cases, premium markets, and other difficult edge
+cases, per the coverage gaps identified in the first expansion batch. Per
+the agreed validation philosophy: **do not modify valuation logic during
+the remainder of this item unless another genuinely systemic issue (like
+the one just fixed) is discovered** — the purpose of the remaining
+expansion is to increase confidence in the engine, not continue tuning it.
+If a new pattern emerges affecting multiple unrelated properties, pause
+again, investigate, fix, then resume — exactly the cycle just completed.
+
+---
+
+## Development Evidence Robustness (new future item, not implemented)
+
+**Motivating cases**: Ladygrove (OX11 9BS) and Pipers Close (CH60 7RE) —
+both properties where Development Evidence, resting on only 1-2
+comparables, ended up dominating (or nearly dominating) the final blend.
+For Pipers Close specifically, the deep forensic trace during the Local
+Market fix's validation confirmed Development Evidence's own £123,100
+figure never changed, but the *weight* resting on it increased from 62.7%
+to 73.7% as a direct, correct consequence of the Local Market fix — meaning
+this property's exposure to Development Evidence's still-unresolved problem
+increased, even though nothing about this fix was wrong.
+
+**Candidate work items** (investigation only — none implemented):
+
+- Robustness of thin evidence groups (very low comp counts, e.g. Development Evidence's 1-2-comp cases here)
+- Extreme comparable influence — how much should a single comp be allowed to dominate a group's valuation
+- Minimum evidence safeguards — is there a principled floor below which a group shouldn't carry significant reconciliation weight regardless of its nominal confidence/status
+- Price-plausibility investigation — Direct/Estate Evidence's `_admit_fallback_comps()` already guards against implausible prices for *type*-fallback admissions specifically; investigate whether an analogous guard is needed for thin groups generally, independent of why they're thin
+- Development Evidence weighting review — once the above are understood, whether Development Evidence's own weighting needs a change analogous to what Local Market just received
+
+Not scheduled against a step number yet — flagged here as the next
+candidate systemic investigation once dataset expansion (item 2) either
+completes or surfaces another pattern first.
 
 ---
 

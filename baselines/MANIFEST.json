@@ -22,7 +22,7 @@
       "version": "v2-evidence-status-fallback-guard-real-hpi-cr1-h0",
       "version_date": "2026-07-09",
       "path": "baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0/",
-      "current": true,
+      "current": false,
       "validated_at": "2026-07-09T16:14:35",
       "validation_summary": {
         "properties_run": 20,
@@ -36,6 +36,28 @@
           "EMPTY": 33
         },
         "fallback_only_groups_confidence_capped_to_low": 8
+      }
+    },
+    {
+      "version": "v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting",
+      "version_date": "2026-07-17",
+      "path": "baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting/",
+      "current": true,
+      "validated_at": "2026-07-17T00:00:00",
+      "validation_summary": {
+        "properties_run": 37,
+        "properties_succeeded": 37,
+        "local_market_evidence_status_totals_after": {
+          "STRONG": 19,
+          "WEAK": 17,
+          "EMPTY": 1
+        },
+        "local_market_evidence_status_strong_to_weak_flips": 7,
+        "properties_with_v2_final_moved_gt_5pct": 7,
+        "final_confidence_label_changes": 0,
+        "recommendation_classification_changes": 2,
+        "direct_and_development_evidence_confirmed_byte_identical": true,
+        "notes": "See baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting/manifest.json for full validation detail and forensic report references."
       }
     }
   ]

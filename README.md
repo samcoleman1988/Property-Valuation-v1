@@ -10,22 +10,22 @@ The app uses the **V2 Evidence-Based Valuation** engine by default. This analyse
 
 The original V1 weighted-average engine is retained as **Legacy V1 Comparison** and can be selected in the sidebar for regression testing.
 
-**Current production baseline: `v2-evidence-status-fallback-guard-real-hpi-cr1-h0`** — see [Validation Status](#validation-status) below and `baselines/MANIFEST.json` for the full version history.
+**Current production baseline: `v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting`** — see [Validation Status](#validation-status) below and `baselines/MANIFEST.json` for the full version history.
 
 ## Validation Status
 
-**Baseline:** `v2-evidence-status-fallback-guard-real-hpi-cr1-h0` (2026-07-09)
+**Baseline:** `v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting` (2026-07-17)
 
-- ✅ 20-property validation set: 20/20 succeeded, 0 failures
+- ✅ 37-property validation set: 37/37 succeeded, 0 failures
 - ✅ Real regional HPI active — comparable prices are adjusted using actual UK House Price Index data, not the flat-rate fallback
-- ✅ **CR1 — Single Source of Truth for Recommendations** complete: pricing classification, investment tagline, negotiation stance, and offer strategy are now decided exactly once (`src/recommendation.py`), consumed identically by the banner, scorecard, risk assessor, and PDF. Six independent duplicate implementations found during a full-codebase audit were removed; `valuation.py` and `scoring.py` (unreferenced prototype code with their own copies of this logic) were deleted.
-- ✅ **H0 — displayed confidence matches Evidence Status** complete: a Direct or Development group classified `FALLBACK_ONLY` can no longer display Medium or High confidence — it's capped at Low(25) with an explicit driver explaining why. Display-only; verified not to affect fair value, weighting, Evidence Status, or Recommendation.
+- ✅ **CR1 — Single Source of Truth for Recommendations** complete (see prior baseline history)
+- ✅ **H0 — displayed confidence matches Evidence Status** complete (see prior baseline history)
+- ✅ **Local Market Evidence property-type weighting** complete: Local Market now applies `property_type_weight()` consistently with Direct and Development Evidence, closing a gap where mixed-type comparables (e.g. Detached properties diluting a Semi-Detached subject's local market) contributed at full weight and were invisible to the Evidence Status classifier. Full forensic investigation and validation in `validation_baselines/forensic_reports/` and `baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting/manifest.json`. Direct Evidence, Development Evidence, comparable retrieval, HPI, geocoding, and V1 are confirmed unchanged.
 - **Latest HPI month available:** 2026-04
-- **Evidence status totals** across the 20-property set (80 group-slots: 4 evidence groups × 20 properties): **26 STRONG, 13 WEAK, 8 FALLBACK_ONLY, 33 EMPTY** — unchanged since the real-HPI baseline; CR1 and H0 are both consistency/display fixes, not weighting changes
-- All 8 FALLBACK_ONLY groups in the validation set had their displayed confidence capped to Low — none showed Medium/High confidence after this fix
-- Fair values, final confidence, and comparable selection are byte-identical to the pre-CR1/pre-H0 baseline for every property
+- **Local Market Evidence Status totals** across the 37-property set: **19 STRONG, 17 WEAK, 1 EMPTY** (post-fix) — 7 properties correctly reclassified STRONG→WEAK by this fix, reflecting real type contamination the classifier was previously blind to
+- 7 of 37 properties moved >5% in final V2 fair value as a direct, traced consequence of this fix; 0 final confidence label changes; 2 Recommendation classification changes, both toward the more moderate "Fairly priced"
 
-Full run data: `validation_baselines/20260709_161403_baseline_v2-evidence-status-fallback-guard-real-hpi-cr1-h0.csv` / `.json`. See `baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0/manifest.json` for what this baseline includes and the full validation methodology.
+Full run data: `validation_baselines/lm_type_weighting_fix/before_37properties_2026-07-17.json` / `after_37properties_2026-07-17.json`. See `baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting/manifest.json` for what this baseline includes and the full validation methodology.
 
 ## Recommended Operating Workflow
 

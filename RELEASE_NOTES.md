@@ -1,5 +1,15 @@
 # Release Notes
 
+## Baseline update — 2026-07-17: Local Market property-type weighting
+
+**Baseline:** `v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting` — see `baselines/v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting/manifest.json` for the full change record and validation methodology.
+
+Local Market Evidence now applies `property_type_weight()` consistently with Direct and Development Evidence. This changes Local Market valuations, Evidence Status and reconciliation weights for properties containing mixed property types. Comparable retrieval, HPI, geocoding, recommendation logic and V1 behaviour are unchanged.
+
+**Why this baseline exists**: expanding the validation dataset from 20 to 37 real properties surfaced a systemic pattern — Local Market Evidence was the only evidence group that admitted a broad mix of property types (e.g. Detached comparables for a Semi-Detached subject) without discounting them, unlike Direct and Development Evidence, which already used `property_type_weight()` for exactly this. A forensic investigation (see `validation_baselines/forensic_reports/`) traced this to a real valuation defect affecting 9 of 37 properties (24%) in the current dataset, most visibly a Didcot property whose V2 fair value reached £1.4M against a £450,000 asking price. The fix reuses the same shared weighting mechanism already validated elsewhere in the engine — no new compatibility matrix, no property-specific tuning.
+
+**Validation**: 37/37 properties succeeded before and after, byte-diffed field-by-field. 7 properties moved >5% in final V2 value — all a subset of the 9 properties independently flagged by the pre-fix forensic scan, confirming no unexpected movement occurred elsewhere. Two focus cases were traced at full per-evidence-group detail to confirm Direct and Development Evidence were byte-identical before and after (i.e. this fix touched only what it was scoped to touch). Full detail in the baseline manifest linked above.
+
 ## v1 Beta — 2026-07-09
 
 First release intended for real-use testing (not just synthetic validation properties). Deployed for mobile access via Streamlit Community Cloud — see the README's "Deploying (v1 Beta)" section.

@@ -1,0 +1,140 @@
+{
+  "18": {
+    "label": "Bracken Close, Didcot",
+    "asking": 340000,
+    "groups": {
+      "direct": {
+        "comp_count": 0,
+        "valuation": 0.0,
+        "status": "EMPTY",
+        "confidence_label": "None",
+        "confidence_score": 0,
+        "weight_in_final": 0.0,
+        "evidence_quality": 100,
+        "type_exact": 0,
+        "type_compatible": 0,
+        "type_unknown": 0,
+        "type_fallback": 0
+      },
+      "development": {
+        "comp_count": 1,
+        "valuation": 272600.0,
+        "status": "FALLBACK_ONLY",
+        "confidence_label": "Low",
+        "confidence_score": 25,
+        "weight_in_final": 0.14285714285714288,
+        "evidence_quality": 0,
+        "type_exact": 0,
+        "type_compatible": 0,
+        "type_unknown": 0,
+        "type_fallback": 1
+      },
+      "local_market": {
+        "comp_count": 445,
+        "valuation": 441800.0,
+        "status": "WEAK",
+        "confidence_label": "Medium",
+        "confidence_score": 50,
+        "weight_in_final": 0.8571428571428572,
+        "evidence_quality": 33,
+        "type_exact": 147,
+        "type_compatible": 0,
+        "type_unknown": 3,
+        "type_fallback": 295
+      },
+      "area_market": {
+        "comp_count": 0,
+        "valuation": 0.0,
+        "status": "EMPTY",
+        "confidence_label": "None",
+        "confidence_score": 0,
+        "weight_in_final": 0.0,
+        "evidence_quality": 100,
+        "type_exact": 0,
+        "type_compatible": 0,
+        "type_unknown": 0,
+        "type_fallback": 0
+      }
+    },
+    "v2_final": 417600.0,
+    "v2_confidence": "Very Low",
+    "v2_confidence_score": 21,
+    "v2_status": "Weak evidence",
+    "gap_pct": -18.6,
+    "dominant_group": "Development Evidence (weak)",
+    "group_weights": {
+      "Development Evidence": 0.1429,
+      "Local Market Evidence": 0.8571
+    },
+    "recommendation": "Undervalued"
+  },
+  "37": {
+    "label": "Pipers Close, Heswall, Wirral",
+    "asking": 850000,
+    "groups": {
+      "direct": {
+        "comp_count": 0,
+        "valuation": 0.0,
+        "status": "EMPTY",
+        "confidence_label": "None",
+        "confidence_score": 0,
+        "weight_in_final": 0.0,
+        "evidence_quality": 100,
+        "type_exact": 0,
+        "type_compatible": 0,
+        "type_unknown": 0,
+        "type_fallback": 0
+      },
+      "development": {
+        "comp_count": 2,
+        "valuation": 123100.0,
+        "status": "WEAK",
+        "confidence_label": "Medium",
+        "confidence_score": 46,
+        "weight_in_final": 0.7368421052631579,
+        "evidence_quality": 77,
+        "type_exact": 0,
+        "type_compatible": 0,
+        "type_unknown": 2,
+        "type_fallback": 0
+      },
+      "local_market": {
+        "comp_count": 85,
+        "valuation": 351600.0,
+        "status": "WEAK",
+        "confidence_label": "Medium",
+        "confidence_score": 50,
+        "weight_in_final": 0.2631578947368421,
+        "evidence_quality": 22,
+        "type_exact": 17,
+        "type_compatible": 0,
+        "type_unknown": 6,
+        "type_fallback": 62
+      },
+      "area_market": {
+        "comp_count": 0,
+        "valuation": 0.0,
+        "status": "EMPTY",
+        "confidence_label": "None",
+        "confidence_score": 0,
+        "weight_in_final": 0.0,
+        "evidence_quality": 100,
+        "type_exact": 0,
+        "type_compatible": 0,
+        "type_unknown": 0,
+        "type_fallback": 0
+      }
+    },
+    "v2_final": 183200.0,
+    "v2_confidence": "Medium",
+    "v2_confidence_score": 47,
+    "v2_status": "Usable with caution",
+    "gap_pct": 364.0,
+    "dominant_group": "Development Evidence",
+    "group_weights": {
+      "Development Evidence": 0.7368,
+      "Local Market Evidence": 0.2632
+    },
+    "recommendation": "Overpriced"
+  }
+}

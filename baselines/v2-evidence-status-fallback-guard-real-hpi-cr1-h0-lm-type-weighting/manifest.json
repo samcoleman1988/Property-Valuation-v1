@@ -1,0 +1,38 @@
+{
+  "version": "v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting",
+  "version_date": "2026-07-17",
+  "created_at": "2026-07-17T00:00:00",
+  "parent_version": "v2-evidence-status-fallback-guard-real-hpi-cr1-h0",
+  "description": "Local Market Evidence now applies property_type_weight() consistently with Direct and Development Evidence. This changes Local Market valuations, Evidence Status and reconciliation weights for properties containing mixed property types. Comparable retrieval, HPI, geocoding, recommendation logic and V1 behaviour are unchanged.",
+  "changes_in_this_version": [
+    "valuation_engine_v2.py: build_local_market_evidence_group() now multiplies each comparable's tier/recency weight by property_type_weight(subject_code, comp.property_type_code) in both the main weighted-mean and per-sqm weighted-mean calculations — the same shared helper already used by build_direct_evidence_group() and build_development_evidence_group(). No second compatibility matrix was introduced.",
+    "valuation_engine_v2.py: type diagnostics for Local Market Evidence now use the same shared classification as Direct/Development (is_property_type_compatible(): exact/compatible/unknown/incompatible), populating type_exact_count, type_compatible_count, unknown_type_count, and type_incompatible_fallback_count honestly, rather than a Local Market-specific binary exact/compatible split that previously folded 'unknown' into 'compatible' and never populated a fallback count at all.",
+    "This fixes a blind spot in _calculate_evidence_quality()/_calculate_evidence_status(): both are shared functions that already read these type-composition fields generically, but Local Market always reported 0% fallback (having no fallback concept of its own), so its STRONG/WEAK classification was previously driven almost entirely by price-spread CV, structurally blind to how much of its evidence was non-exact type. No new thresholds were added to either shared function — only the diagnostic inputs Local Market feeds them changed.",
+    "_assess_local_quality() now appends a factual weakness ('Local market evidence includes a mixture of property types; non-exact types were downweighted.') when non-exact types exceed 25% of the group. Not surfaced at the Recommendation level.",
+    "build_area_market_evidence_group()'s placeholder docstring documents the same pattern to follow when that group is eventually implemented."
+  ],
+  "not_changed": [
+    "comparable retrieval / admission gates (Local Market's broad V1 type gate is unchanged — the same comparables are admitted, only reweighted and rediagnosed)",
+    "Direct Evidence",
+    "Development (Estate) Evidence",
+    "property-type compatibility definitions (is_property_type_compatible(), property_type_weight() coefficients unchanged)",
+    "HPI adjustment",
+    "geocoding",
+    "Recommendation logic (recommendation.py untouched)",
+    "confidence formulas (only their inputs changed for Local Market, per the blind-spot fix above)",
+    "V1 (valuation_engine.py untouched)"
+  ],
+  "motivating_investigation": [
+    "validation_baselines/forensic_reports/property_27_ladygrove_didcot.md",
+    "validation_baselines/forensic_reports/stage2_local_market_type_weighting_audit.md",
+    "validation_baselines/forensic_reports/stage3_property_37_bungalow_forensic.md"
+  ],
+  "validation": {
+    "method": "Full 37-property validation set run twice — once with this change stashed (git stash) to capture true before-state, once with it applied — capturing Local Market valuation, evidence_status, evidence_quality, confidence, type counts, reconciliation weight_in_final, final V2 fair value, final confidence, valuation_status, dominant_group, and Recommendation.pricing_classification for every property. Two focus cases (Ladygrove OX11 9BS, and Bracken Close/Pipers Close) additionally traced at full per-group detail (all four evidence groups) in both states to confirm Direct and Development Evidence were byte-identical before and after.",
+    "result": "37/37 properties succeeded in both passes, 0 errors. Existing regression suites (test_location_assessment.py, test_recommendation_shape.py) pass unchanged. 7 properties moved >5% in final V2 value (Chestnut Close Witney -5.9%, Vyner Road South Prenton -6.7%, Dee Park Road Heswall +7.3%, Bostock Road Abingdon +6.3%, Bracken Close Didcot +7.6%, Market Place Faringdon +5.2%, Pipers Close Heswall -8.3%) — all 7 are a subset of the 9 properties independently flagged by the pre-implementation forensic scan; no property outside that set moved unexpectedly. 7 properties' Local Market evidence_status flipped STRONG to WEAK (correctly reflecting real type contamination that was previously invisible to the classifier). Zero final confidence label changes across all 37. Two Recommendation classification changes (Chestnut Close, Dee Park Road), both moving toward the more moderate 'Fairly priced' classification as the underlying gap-to-asking genuinely narrowed. One credibility-heuristic regression (Bracken Close, CREDIBLE to REVIEW, gap 14.1% to 22.8%) — traced in full and determined to be a genuine improvement exposing a real evidence weakness (a single fallback-only Development comparable was always this property's only other evidence source; Local Market's previously-false STRONG status was masking that), not a defect. Ladygrove (OX11 9BS): Local Market valuation corrected from £560,800 to £470,700 (-16.1%, matching the forensic counterfactual estimate of £470,763 almost exactly), but the property's headline anomaly (final V2 ~£1.4M vs £450,000 asking) remains largely unresolved because Development Evidence — untouched by this fix, out of scope — dominates its blend at ~67% weight; flagged as a distinct future investigation (see Development Evidence robustness item in ROADMAP.md), not fixed here.",
+    "before_file": "validation_baselines/lm_type_weighting_fix/before_37properties_2026-07-17.json",
+    "after_file": "validation_baselines/lm_type_weighting_fix/after_37properties_2026-07-17.json",
+    "focus_case_before_file": "validation_baselines/lm_type_weighting_fix/before_focus_bracken_pipers_2026-07-17.json",
+    "focus_case_after_file": "validation_baselines/lm_type_weighting_fix/after_focus_bracken_pipers_2026-07-17.json"
+  }
+}
