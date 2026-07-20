@@ -15,7 +15,7 @@ record only.
 ## Implementation Order (agreed, final)
 
 1. ~~Outcome tracking infrastructure~~ — **Done.** `outcome_tracking` table + capture wired into app.py.
-2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 37/~100, pause LIFTED (2026-07-17).**
+2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 44/~100, pause LIFTED (2026-07-17).**
    - **Geocoding dedupe/batching — Done, committed (`68b614b`), pushed.** Fixed in `src/transport.py` (`geocode_postcodes_batch()`) and `src/comparable_engine.py`. Validated: 4-property cold-cache benchmark showed 3.4-6.6x speedup, 0 mismatches against sequential results, 100% warm-cache hit rate on re-run.
    - **Local Market property-type weighting — Done.** The systemic finding that paused this item (9/37 = 24% of properties affected by Local Market admitting mixed property types without discounting them, unlike Direct/Development) has been fixed, forensically validated (full per-group trace on two focus cases, 37/37 properties re-run before/after with zero unexplained movement), approved, and promoted as baseline `v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting`. See that baseline's `manifest.json` and `validation_baselines/forensic_reports/` for full detail. **Dataset expansion pause is lifted — resuming toward ~100.**
    - One finding from this investigation was deliberately *not* fixed and is carried forward as a new future item — see "Development Evidence Robustness" below.
@@ -154,7 +154,7 @@ records human judgement about why.
 
 ---
 
-## 2. Expand Validation Dataset (~100 properties) — IN PROGRESS: 37/~100
+## 2. Expand Validation Dataset (~100 properties) — IN PROGRESS: 44/~100
 
 Grow the fixed set in `validate_baseline.py` from 20 to roughly 100
 properties, stratified across property type, region, and evidence-status mix
@@ -162,15 +162,28 @@ properties, stratified across property type, region, and evidence-status mix
 territory, not just STRONG) — 20 is enough to catch gross regressions but too
 small to detect calibration drift.
 
-**Status**: 37 properties collected and validated (20 original + 17 sourced
-live from real Rightmove listings, 2026-07). Full run output preserved at
-`validation_baselines/20260715_194932_baseline_v2-evidence-status-fallback-guard-real-hpi-cr1-h0_item2-expansion-37.csv`/`.json`.
+**Status**: 44 properties collected and validated (20 original + 17 from the
+first expansion batch + 7 from the second batch, all sourced live from real
+Rightmove listings, 2026-07). Full run output preserved at
+`validation_baselines/20260715_194932_baseline_v2-evidence-status-fallback-guard-real-hpi-cr1-h0_item2-expansion-37.csv`/`.json`
+(first batch, 37 properties) and
+`validation_baselines/20260720_155601_baseline_v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting.csv`/`.json`
+(current, 44 properties, 0 errors).
 
-**Known remaining gaps** (from the 37-property run's own coverage review):
-bungalows (2/37), confirmed-leasehold flats (5/17 of the new batch have
-confirmed tenure), and genuinely different UK regions (still only an
-Oxfordshire + North West axis — Banbury/Faringdon are Oxfordshire-adjacent,
-not a structurally different market).
+**Second batch (37→44) added**: one confirmed-leasehold flat (Bristol, The
+Vincent, BS6 6BJ — closes the confirmed-leasehold gap) and three genuinely
+new UK regions with no prior coverage — South West (Bristol), Yorkshire
+(York), South East/Kent (Canterbury) — versus the first batch's
+Oxfordshire/North-West-only geography.
+
+**Known remaining gaps** (updated after the second batch): bungalows still
+thin (2/44 confirmed), confirmed-leasehold flats improved but still light
+relative to real UK stock composition (6/44 confirmed), sparse-comparable
+and unusual-property-type cases could still use more deliberate examples
+beyond what's fallen out incidentally, and the three new regions added are
+each represented by only 1-4 properties — not yet enough per-region density
+to be a robust regional cross-check on their own. The bulk of the dataset
+(37 of 44) remains on the original Oxfordshire + North West axis.
 
 **Property #37 (Pipers Close, Heswall, CH60 7RE)** was flagged untrustworthy
 in the original run (0.0s elapsed, V1=V2=£0, likely a network-resume
