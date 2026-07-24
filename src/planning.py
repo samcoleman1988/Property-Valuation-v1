@@ -11,7 +11,13 @@ from dataclasses import dataclass, field, asdict
 from .utils import cache_key, get_cached, set_cache
 from .planning_cache import fetch_with_cache
 
-PLANNING_API_BASE = "https://www.planning.data.gov.uk/api/v1"
+# Verified live 2026-07 against the official Planning Data API docs and a
+# direct successful request: GET /entity.json?latitude=..&longitude=..&dataset=..
+# The previously-used PLANNING_API_BASE + "/dataset/<name>/point" path (an
+# apparent v1-era path) returns a genuine 404 "Page not found" from the
+# live service — confirmed by a direct request outside this codebase, not
+# assumed. This is the corrected, current base URL.
+PLANNING_API_BASE = "https://www.planning.data.gov.uk"
 
 
 @dataclass
@@ -93,8 +99,13 @@ def _fetch_dataset_point(dataset: str, lat: float, lon: float) -> Optional[dict]
     tolerated before caching was added, just no longer silent (see
     planning_cache.py's logging).
     """
-    url = f"{PLANNING_API_BASE}/dataset/{dataset}/point"
-    params = {"lat": lat, "lng": lon}
+    # Corrected request shape (verified live, see PLANNING_API_BASE comment
+    # above): single /entity.json endpoint, dataset as a query parameter
+    # (not a path segment), coordinates as latitude/longitude (not lat/lng).
+    # Response parsing is unchanged — the live response confirmed the same
+    # "count" and "entities" keys the existing parsing code already reads.
+    url = f"{PLANNING_API_BASE}/entity.json"
+    params = {"latitude": lat, "longitude": lon, "dataset": dataset}
 
     def _do_fetch():
         try:

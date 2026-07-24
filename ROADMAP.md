@@ -292,20 +292,57 @@ returns. Existing regression suites (`test_location_assessment.py`,
 
 ---
 
-## 3. Planning API Caching (highest-priority engineering fix)
+## 3. Planning API Caching — DONE (2026-07)
 
-`planning.py`'s `_check_constraints()` makes six sequential, **entirely
-uncached** network requests per valuation (conservation area, listed
-building, green belt, AONB, article 4, flood zone) — the only uncached
-external call path in the pipeline, despite already importing the caching
-utilities used everywhere else.
+`planning.py`'s `_check_constraints()` made six sequential, entirely
+uncached network requests per valuation. Fixed via a dedicated
+`src/planning_cache.py` read-through cache (`data/cache/planning/<source>/<cache_key>.json`,
+90-day TTL, never overwrites a valid entry with a failed/invalid response,
+zero-result responses cached and marked explicitly). 11 unit tests, all
+passing, mocked API responses only.
 
-- **Cache key**: `cache_key("planning", {"pc": postcode, "lat": latitude, "lon": longitude})`, one entry covering all six checks together.
-- **Infrastructure**: reuse `get_cached`/`set_cache` from `utils.py`, exactly as `transport.py` already does for geocoding.
-- **TTL**: 90 days (2160h). Statutory planning designations move at the pace of local plan reviews (annual at the fastest, often multi-year) — materially slower than HPI (30-day TTL) and comparable in stability to geocoding (1-year TTL). This tool advises on extension *potential*, not a legal determination, so a 90-day-stale boundary carries negligible practical risk.
-- **Zero valuation impact**: planning/extension-potential data is already fully disconnected from `fair_value_balanced` and all evidence groups — caching it cannot touch valuation maths by construction.
-- **Validation**: byte-diff `validate_baseline.py` output before/after across every field, not just fair value. Expect zero changed fields anywhere in valuation output; only `elapsed_seconds` should drop on a warm-cache run.
-- **Bundled fix**: while touching this function, also address the silent-failure gap found during review — every one of the six checks currently uses a bare `except Exception: pass` with no failure recorded, so "No major constraints identified" is indistinguishable from "5 of 6 checks errored." Record which checks succeeded vs failed alongside the cached result (feeds item 5's retrieval-state work).
+**While implementing this, a live-API defect was discovered and fixed as a
+separate, tightly-scoped follow-up**: the Planning Data API's public
+contract had changed since this integration was written — the old
+`/api/v1/dataset/<name>/point?lat=&lng=` path returns a genuine 404 on the
+live service; the corrected, verified-live contract is
+`/entity.json?latitude=&longitude=&dataset=`. Confirmed via official docs
+and direct live requests, not guessed. Fixed in `src/planning.py`
+(`PLANNING_API_BASE` and `_fetch_dataset_point()`), response parsing
+unchanged (the live response confirmed the same `count`/`entities` keys
+already expected). Full live end-to-end validation: 18/18 real requests
+succeeded across 3 known properties x 6 datasets on a cold cache, 18/18
+served from cache with zero network calls on a second identical run,
+identical planning interpretation both times.
+
+Zero valuation impact confirmed both before and after this repair —
+planning data has no code path into `validate_baseline.py` or the
+valuation pipeline; this was never eligible for baseline promotion.
+
+---
+
+## Validation Harness Reproducibility (future item, not implemented)
+
+**Finding**: re-running the same 44-property validation set a few days
+apart (unrelated to any code change) produced different `evidence_status`
+for 5 properties. Traced precisely: comparable recency is evaluated
+relative to `datetime.now()` at fetch time, so baseline outputs can change
+as transactions cross fixed age thresholds (Direct's 3-year, Development's
+5-year cutoffs) even when code and source data are unchanged. This is a
+pre-existing property of the harness (already partially documented in
+`validate_baseline.py`'s own docstring), not a regression from any recent
+change — confirmed by the fact that `validate_baseline.py` has no code
+path into whatever changed between the two runs in question.
+
+**Candidate fix** (not implemented — documentation only):
+- Introduce an explicit valuation `as_of_date`.
+- Persist it in baseline metadata.
+- Use it for comparable-age calculations during regression runs, so a
+  baseline re-run is reproducible against a frozen date rather than
+  wall-clock time.
+- Allow production runs (the live app) to default to the current date, as
+  today — this only affects regression/validation reproducibility, not
+  live behaviour.
 
 ---
 
