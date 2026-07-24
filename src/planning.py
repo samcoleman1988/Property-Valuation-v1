@@ -9,6 +9,7 @@ from typing import Optional
 from dataclasses import dataclass, field, asdict
 
 from .utils import cache_key, get_cached, set_cache
+from .planning_cache import fetch_with_cache
 
 PLANNING_API_BASE = "https://www.planning.data.gov.uk/api/v1"
 
@@ -83,104 +84,81 @@ def assess_planning(
     return assessment
 
 
+def _fetch_dataset_point(dataset: str, lat: float, lon: float) -> Optional[dict]:
+    """Point-lookup a single Planning Data API dataset, through the
+    read-through cache in planning_cache.py. Returns the response payload
+    dict on success (including a legitimate zero-result response), or
+    None if the data is genuinely unavailable (the live call failed and no
+    cache existed) — the same "no data" behaviour every caller already
+    tolerated before caching was added, just no longer silent (see
+    planning_cache.py's logging).
+    """
+    url = f"{PLANNING_API_BASE}/dataset/{dataset}/point"
+    params = {"lat": lat, "lng": lon}
+
+    def _do_fetch():
+        try:
+            resp = requests.get(url, params=params, timeout=10)
+            payload = resp.json() if resp.status_code == 200 else None
+            return resp.status_code, payload
+        except Exception:
+            return None, None
+
+    result = fetch_with_cache(
+        source=dataset, request_url=url, query_params=params, fetch_fn=_do_fetch,
+    )
+    return result.payload
+
+
 def _check_constraints(
     assessment: PlanningAssessment,
     postcode: str,
     lat: float,
     lon: float,
 ):
-    """Check planning constraints using Planning Data API."""
+    """Check planning constraints using the Planning Data API.
+
+    Six lookups, one per dataset — logic is unchanged from before caching
+    was added (same datasets, same "count > 0" interpretation, same flood
+    zone parsing); only how each lookup is fetched changed, via
+    _fetch_dataset_point()/planning_cache.py.
+    """
     if not lat or not lon:
         assessment.warnings.append("No coordinates available — constraint check limited")
         return
 
-    try:
-        # Check conservation areas
-        resp = requests.get(
-            f"{PLANNING_API_BASE}/dataset/conservation-area/point",
-            params={"lat": lat, "lng": lon},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("count", 0) > 0:
-                assessment.conservation_area = True
-                assessment.constraints_summary.append("Conservation Area")
-    except Exception:
-        pass
+    data = _fetch_dataset_point("conservation-area", lat, lon)
+    if data and data.get("count", 0) > 0:
+        assessment.conservation_area = True
+        assessment.constraints_summary.append("Conservation Area")
 
-    try:
-        resp = requests.get(
-            f"{PLANNING_API_BASE}/dataset/listed-building-outline/point",
-            params={"lat": lat, "lng": lon},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("count", 0) > 0:
-                assessment.listed_building = True
-                assessment.constraints_summary.append("Listed Building")
-    except Exception:
-        pass
+    data = _fetch_dataset_point("listed-building-outline", lat, lon)
+    if data and data.get("count", 0) > 0:
+        assessment.listed_building = True
+        assessment.constraints_summary.append("Listed Building")
 
-    try:
-        resp = requests.get(
-            f"{PLANNING_API_BASE}/dataset/green-belt/point",
-            params={"lat": lat, "lng": lon},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("count", 0) > 0:
-                assessment.green_belt = True
-                assessment.constraints_summary.append("Green Belt")
-    except Exception:
-        pass
+    data = _fetch_dataset_point("green-belt", lat, lon)
+    if data and data.get("count", 0) > 0:
+        assessment.green_belt = True
+        assessment.constraints_summary.append("Green Belt")
 
-    try:
-        resp = requests.get(
-            f"{PLANNING_API_BASE}/dataset/area-of-outstanding-natural-beauty/point",
-            params={"lat": lat, "lng": lon},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("count", 0) > 0:
-                assessment.aonb = True
-                assessment.constraints_summary.append("AONB")
-    except Exception:
-        pass
+    data = _fetch_dataset_point("area-of-outstanding-natural-beauty", lat, lon)
+    if data and data.get("count", 0) > 0:
+        assessment.aonb = True
+        assessment.constraints_summary.append("AONB")
 
-    try:
-        resp = requests.get(
-            f"{PLANNING_API_BASE}/dataset/article-4-direction-area/point",
-            params={"lat": lat, "lng": lon},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("count", 0) > 0:
-                assessment.article_4 = True
-                assessment.constraints_summary.append("Article 4 Direction")
-    except Exception:
-        pass
+    data = _fetch_dataset_point("article-4-direction-area", lat, lon)
+    if data and data.get("count", 0) > 0:
+        assessment.article_4 = True
+        assessment.constraints_summary.append("Article 4 Direction")
 
-    try:
-        resp = requests.get(
-            f"{PLANNING_API_BASE}/dataset/flood-risk-zone/point",
-            params={"lat": lat, "lng": lon},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("count", 0) > 0:
-                items = data.get("entities", data.get("results", []))
-                if items:
-                    zone = str(items[0].get("flood-risk-level", items[0].get("name", "")))
-                    assessment.flood_zone = zone
-                    assessment.constraints_summary.append(f"Flood Zone: {zone}")
-    except Exception:
-        pass
+    data = _fetch_dataset_point("flood-risk-zone", lat, lon)
+    if data and data.get("count", 0) > 0:
+        items = data.get("entities", data.get("results", []))
+        if items:
+            zone = str(items[0].get("flood-risk-level", items[0].get("name", "")))
+            assessment.flood_zone = zone
+            assessment.constraints_summary.append(f"Flood Zone: {zone}")
 
     if not assessment.constraints_summary:
         assessment.constraints_summary.append("No major constraints identified (data may be incomplete)")
