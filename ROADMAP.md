@@ -292,32 +292,46 @@ returns. Existing regression suites (`test_location_assessment.py`,
 
 ---
 
-## 3. Planning API Caching — DONE (2026-07)
+## 3. Planning API Caching — COMPLETE (2026-07)
 
 `planning.py`'s `_check_constraints()` made six sequential, entirely
 uncached network requests per valuation. Fixed via a dedicated
 `src/planning_cache.py` read-through cache (`data/cache/planning/<source>/<cache_key>.json`,
 90-day TTL, never overwrites a valid entry with a failed/invalid response,
-zero-result responses cached and marked explicitly). 11 unit tests, all
-passing, mocked API responses only.
+zero-result responses cached and marked explicitly).
 
-**While implementing this, a live-API defect was discovered and fixed as a
-separate, tightly-scoped follow-up**: the Planning Data API's public
-contract had changed since this integration was written — the old
-`/api/v1/dataset/<name>/point?lat=&lng=` path returns a genuine 404 on the
-live service; the corrected, verified-live contract is
-`/entity.json?latitude=&longitude=&dataset=`. Confirmed via official docs
-and direct live requests, not guessed. Fixed in `src/planning.py`
-(`PLANNING_API_BASE` and `_fetch_dataset_point()`), response parsing
-unchanged (the live response confirmed the same `count`/`entities` keys
-already expected). Full live end-to-end validation: 18/18 real requests
-succeeded across 3 known properties x 6 datasets on a cold cache, 18/18
-served from cache with zero network calls on a second identical run,
-identical planning interpretation both times.
+- **Cache infrastructure commit**: `d8c057b`
+- **API endpoint repair commit**: `a370efa`
+- **Schema-correction/defensive-fix commit**: see below (this section)
+- **Baseline promotion**: not required — planning data has no code path
+  into `validate_baseline.py` or the valuation pipeline, confirmed both
+  before and after every change in this item.
 
-Zero valuation impact confirmed both before and after this repair —
-planning data has no code path into `validate_baseline.py` or the
-valuation pipeline; this was never eligible for baseline promotion.
+**Live-API defect found and fixed as a separate, tightly-scoped
+follow-up**: the Planning Data API's public contract had changed since
+this integration was written — the old `/api/v1/dataset/<name>/point?lat=&lng=`
+path returns a genuine 404 on the live service; the corrected,
+verified-live contract is `/entity.json?latitude=&longitude=&dataset=`.
+Confirmed via official docs and direct live requests, not guessed. Full
+live end-to-end validation: 18/18 real requests succeeded across 3 known
+properties x 6 datasets on a cold cache, 18/18 served from cache with
+zero network calls on a second identical run, identical planning
+interpretation both times.
+
+**Response schema — corrected record**: live testing observed `count` and
+`entities` both present in every response checked (6 datasets, multiple
+coordinate sets, zero- and non-zero-result cases) — an earlier draft of
+this investigation stated "no count field" based on a single truncated
+preview and was mistaken; the properly-verified evidence (explicit
+`list(body.keys())` checks) showed `count` present throughout. However,
+the official documentation does not explicitly guarantee `count` is
+always present in the response envelope, so `src/planning.py` now derives
+the result count via a small `_entity_count()` helper — `count` if
+present, else `len(entities)` — rather than assuming a missing `count`
+means zero results. Behaviour-neutral in every case actually observed;
+defends against an undocumented edge case, not an observed failure.
+Covered by a new mocked test (`test_entity_count_schema_behaviour` in
+`test_planning_cache.py`).
 
 ---
 

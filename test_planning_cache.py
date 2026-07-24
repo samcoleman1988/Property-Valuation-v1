@@ -199,6 +199,29 @@ def test_auth_and_rate_limit_responses_not_cached():
         print("OK: 429 (rate limit) and 403 (auth) responses are never cached")
 
 
+def test_entity_count_schema_behaviour():
+    """src.planning._entity_count() -- covers the count/entities schema
+    finding from live validation: 'count' was observed present in every
+    real response tested, but the official docs don't explicitly guarantee
+    it, so this must fall back to len(entities) if 'count' is ever absent.
+    """
+    from src.planning import _entity_count
+
+    # Observed live shape: count present and matches entities.
+    assert _entity_count({"count": 1, "entities": [{"name": "x"}], "links": {}}) == 1
+    # Observed live shape: legitimate zero-result response.
+    assert _entity_count({"count": 0, "entities": [], "links": {}}) == 0
+    # Defensive case: count absent (not observed live, but not ruled out
+    # by the documented contract either) -- must derive from entities.
+    assert _entity_count({"entities": [{"name": "a"}, {"name": "b"}], "links": {}}) == 2
+    assert _entity_count({"entities": [], "links": {}}) == 0
+    # count present but explicitly zero must be trusted as-is, not
+    # overridden by a non-empty entities list (count is source of truth
+    # when it exists at all).
+    assert _entity_count({"count": 0, "entities": [{"name": "stale"}]}) == 0
+    print("OK: _entity_count() prefers 'count' when present, falls back to len(entities) when absent")
+
+
 if __name__ == "__main__":
     test_same_query_same_key()
     test_changed_params_changed_key()
@@ -211,4 +234,5 @@ if __name__ == "__main__":
     test_valid_zero_result_is_cached()
     test_disabled_cache_bypasses_storage()
     test_auth_and_rate_limit_responses_not_cached()
+    test_entity_count_schema_behaviour()
     print("\nALL PLANNING CACHE TESTS PASSED")

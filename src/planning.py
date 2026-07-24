@@ -121,6 +121,23 @@ def _fetch_dataset_point(dataset: str, lat: float, lon: float) -> Optional[dict]
     return result.payload
 
 
+def _entity_count(data: dict) -> int:
+    """Result count for a Planning Data API entity.json response.
+
+    Live testing (2026-07) observed "count" present in 100% of responses
+    across all 6 datasets used here, in both zero- and non-zero-result
+    cases, and consistent with len(entities) where checked directly. The
+    official documentation, however, does not explicitly guarantee "count"
+    is always present in the response envelope — so this falls back to
+    len(entities) if it's ever missing, rather than assuming absence means
+    zero (which the previous data.get("count", 0) default effectively
+    did). Cheap, behaviour-neutral in every case actually observed so far.
+    """
+    if "count" in data:
+        return data["count"]
+    return len(data.get("entities", []))
+
+
 def _check_constraints(
     assessment: PlanningAssessment,
     postcode: str,
@@ -139,32 +156,32 @@ def _check_constraints(
         return
 
     data = _fetch_dataset_point("conservation-area", lat, lon)
-    if data and data.get("count", 0) > 0:
+    if data and _entity_count(data) > 0:
         assessment.conservation_area = True
         assessment.constraints_summary.append("Conservation Area")
 
     data = _fetch_dataset_point("listed-building-outline", lat, lon)
-    if data and data.get("count", 0) > 0:
+    if data and _entity_count(data) > 0:
         assessment.listed_building = True
         assessment.constraints_summary.append("Listed Building")
 
     data = _fetch_dataset_point("green-belt", lat, lon)
-    if data and data.get("count", 0) > 0:
+    if data and _entity_count(data) > 0:
         assessment.green_belt = True
         assessment.constraints_summary.append("Green Belt")
 
     data = _fetch_dataset_point("area-of-outstanding-natural-beauty", lat, lon)
-    if data and data.get("count", 0) > 0:
+    if data and _entity_count(data) > 0:
         assessment.aonb = True
         assessment.constraints_summary.append("AONB")
 
     data = _fetch_dataset_point("article-4-direction-area", lat, lon)
-    if data and data.get("count", 0) > 0:
+    if data and _entity_count(data) > 0:
         assessment.article_4 = True
         assessment.constraints_summary.append("Article 4 Direction")
 
     data = _fetch_dataset_point("flood-risk-zone", lat, lon)
-    if data and data.get("count", 0) > 0:
+    if data and _entity_count(data) > 0:
         items = data.get("entities", data.get("results", []))
         if items:
             zone = str(items[0].get("flood-risk-level", items[0].get("name", "")))
