@@ -299,59 +299,89 @@ GROUP_KEYS = ["Direct Evidence", "Development Evidence", "Local Market Evidence"
 # Derived from direct observation of two confirmed environmental-corruption
 # incidents (Pipers Close, first expansion batch; properties #47-52, third
 # expansion batch — see validation_baselines/property_37_reruns/ and
-# validation_baselines/second_expansion_batch_reruns/). In every confirmed
-# case, elapsed_seconds was exactly 0.0 and v1_value/v2_value were both 0,
-# with no exception raised (error=None) and every per-group evidence_status
-# field populated identically to what a genuine "no evidence found" result
-# would show (e.g. "EMPTY", comp_count=0) — meaning the group-level fields
-# do NOT distinguish corruption from a genuine empty result; only elapsed
-# time does. Every confirmed GENUINE zero-evidence result observed so far
-# took at least several seconds (minimum observed: 4.8s, property #26
-# "Valley Park" in the 44-property run) — real API round-trips, even ones
-# that ultimately find nothing, take measurable time. The threshold below
-# sits with a wide margin below every genuine observation and a wide margin
-# above every corrupted observation; it is not an arbitrary "== 0.0" guess.
-ENV_INVALID_ELAPSED_THRESHOLD_SECONDS = 1.0
+# validation_baselines/second_expansion_batch_reruns/). In EVERY confirmed
+# case, elapsed_seconds was exactly 0.0 — never any other value — with
+# v1_value/v2_value both 0 and no exception raised. Per-group
+# evidence_status fields were populated identically to a genuine "no
+# evidence found" result (e.g. "EMPTY", comp_count=0), so they do NOT
+# distinguish corruption from a genuine empty result; only elapsed time
+# does, and specifically the value 0.0, not a range around it.
+#
+# Every confirmed GENUINE zero-evidence result observed so far took at
+# least several seconds (minimum observed: 4.8s, property #26 "Valley
+# Park" in the 44-property run).
+#
+# A live run (2026-07-25) exposed a genuine gap in an earlier version of
+# this classifier: property #43 (18 Victoria, Hudson Quarter, York) showed
+# elapsed=0.5s with v1=v2=0 and was flagged using a "< 1.0s" buffer band
+# that was never itself observed in a confirmed corruption case — that
+# buffer was an engineering safety margin, not evidence. On rerun, #43
+# reproduced the identical result (0.5s, £0, twice) — reproducibility is
+# evidence AGAINST random environmental corruption, which would not be
+# expected to recur identically. The classifier below no longer conflates
+# "matches the confirmed signature exactly" with "falls in an unverified
+# buffer near it" — those are now two distinct, honestly-labelled tiers.
+CONFIRMED_CORRUPTION_ELAPSED_SECONDS = 0.0  # exact value seen in every confirmed incident
+GENUINE_FAILURE_MIN_OBSERVED_SECONDS = 4.8  # fastest confirmed-genuine empty result seen so far
 
 
 def _classify_run_quality(row: dict) -> str:
     """Classify a single run_one() result as one of:
-      "success"              — a real, usable valuation was produced.
-      "environmental_invalid" — matches the corruption signature: near-zero
-                                 elapsed time combined with zero valuation
-                                 output and no exception recorded. Almost
-                                 certainly a network-stack-not-ready or
-                                 machine-sleep artifact, not a genuine
-                                 finding about the property.
-      "genuine_failure"      — a real attempt was made (measurable elapsed
-                                 time) but no usable evidence/valuation
-                                 resulted, or an exception was caught.
+
+      "SUCCESS"
+          A real, usable valuation was produced (v2_value > 0).
+
+      "CONFIRMED_ENVIRONMENTAL_INVALID"
+          Matches the exact signature observed in both confirmed
+          corruption incidents: elapsed_seconds == 0.0, v1_value ==
+          v2_value == 0, no exception. Not a range — the literal value
+          every confirmed incident showed.
+
+      "SUSPECT_ENVIRONMENTAL"
+          v2_value is empty and elapsed_seconds is neither the confirmed
+          corruption value (0.0) nor within the confirmed-genuine range
+          (>= GENUINE_FAILURE_MIN_OBSERVED_SECONDS) — an unusual pattern
+          worth a single rerun, but NOT yet proven to be corruption. This
+          is the honest "we don't have evidence either way yet" bucket.
+
+      "GENUINE_FAILURE"
+          v2_value is empty, but either an exception was caught, or the
+          elapsed time is consistent with every confirmed-genuine empty
+          result observed so far (>= GENUINE_FAILURE_MIN_OBSERVED_SECONDS).
+
     Does not change or reinterpret any valuation field — read-only
-    classification of the harness's own output.
+    classification of the harness's own output. Callers should rerun once
+    on CONFIRMED_ENVIRONMENTAL_INVALID or SUSPECT_ENVIRONMENTAL; if the
+    rerun reproduces the same non-success tier, the property should be
+    recorded as GENUINE_FAILURE (repeatable after rerun), not left
+    ambiguously "still invalid" — reproducibility argues for a real,
+    reproducible outcome rather than random corruption.
     """
     elapsed = row.get("elapsed_seconds")
     v1 = row.get("v1_value") or 0
     v2 = row.get("v2_value") or 0
     has_error = bool(row.get("error"))
 
-    if has_error:
-        return "genuine_failure"
-
     # V2 is the primary engine's output — a usable result means v2 > 0,
     # matching credibility_judgement()'s own existing v2-keyed logic.
     v2_empty = v2 in (0, None)
-    # The specific corruption signature observed in both confirmed
-    # incidents was BOTH engines returning zero simultaneously (they share
-    # the same empty comparable-evidence input) — used only to strengthen
-    # the environmental_invalid match, not to gate genuine_failure.
-    both_empty = v2_empty and (v1 in (0, None))
-    suspiciously_fast = elapsed is not None and elapsed < ENV_INVALID_ELAPSED_THRESHOLD_SECONDS
 
-    if both_empty and suspiciously_fast:
-        return "environmental_invalid"
-    if v2_empty:
-        return "genuine_failure"
-    return "success"
+    if not v2_empty and not has_error:
+        return "SUCCESS"
+
+    if has_error:
+        return "GENUINE_FAILURE"
+
+    both_empty = v2_empty and (v1 in (0, None))
+    if both_empty and elapsed == CONFIRMED_CORRUPTION_ELAPSED_SECONDS:
+        return "CONFIRMED_ENVIRONMENTAL_INVALID"
+
+    if elapsed is not None and elapsed >= GENUINE_FAILURE_MIN_OBSERVED_SECONDS:
+        return "GENUINE_FAILURE"
+
+    # v2 empty, no error, elapsed neither the confirmed-corrupt value nor
+    # within the confirmed-genuine range — genuinely ambiguous.
+    return "SUSPECT_ENVIRONMENTAL"
 
 
 def credibility_judgement(v2_value: float, asking: float, confidence_label: str) -> str:
@@ -496,14 +526,16 @@ def main():
     recovered_after_rerun_n = []
     true_failures_n = []
 
+    RERUN_TRIGGER_TIERS = ("CONFIRMED_ENVIRONMENTAL_INVALID", "SUSPECT_ENVIRONMENTAL")
+
     for p in PROPERTIES:
         print(f"[{p['n']}/{len(PROPERTIES)}] {p['label']} ({p['postcode']})...", flush=True)
         row = run_one(p)
         quality = _classify_run_quality(row)
 
-        if quality != "environmental_invalid":
+        if quality not in RERUN_TRIGGER_TIERS:
             rows.append(row)
-            if quality == "success":
+            if quality == "SUCCESS":
                 successful_first_pass_n.append(p["n"])
             else:
                 true_failures_n.append(p["n"])
@@ -515,13 +547,20 @@ def main():
                       f"[{row['elapsed_seconds']}s]", flush=True)
             continue
 
-        # --- Environmentally invalid: rerun once immediately ---
-        reason = (
-            f"elapsed_seconds={row['elapsed_seconds']} (< {ENV_INVALID_ELAPSED_THRESHOLD_SECONDS}s) "
-            f"with v1_value={row['v1_value']}, v2_value={row['v2_value']}, error=None — "
-            f"matches the confirmed environmental-corruption signature, not a genuine result"
-        )
-        print(f"  *** FLAGGED environmental_invalid: {reason} — rerunning once ***", flush=True)
+        # --- CONFIRMED_ENVIRONMENTAL_INVALID or SUSPECT_ENVIRONMENTAL: rerun once ---
+        if quality == "CONFIRMED_ENVIRONMENTAL_INVALID":
+            reason = (
+                f"elapsed_seconds={row['elapsed_seconds']} matches the exact confirmed "
+                f"corruption signature ({CONFIRMED_CORRUPTION_ELAPSED_SECONDS}s, v1=v2=0, no error)"
+            )
+        else:
+            reason = (
+                f"elapsed_seconds={row['elapsed_seconds']} with v1_value={row['v1_value']}, "
+                f"v2_value={row['v2_value']}, error=None — unusual pattern (neither the confirmed "
+                f"corrupt value {CONFIRMED_CORRUPTION_ELAPSED_SECONDS}s nor the confirmed-genuine "
+                f"range >= {GENUINE_FAILURE_MIN_OBSERVED_SECONDS}s), not yet proven corruption"
+            )
+        print(f"  *** FLAGGED {quality}: {reason} — rerunning once ***", flush=True)
         original_results_for_reruns.append(row)
         rerun_row = run_one(p)
         rerun_quality = _classify_run_quality(rerun_row)
@@ -532,26 +571,37 @@ def main():
             or row.get("v2_confidence_label") != rerun_row.get("v2_confidence_label")
         )
 
-        if rerun_quality != "environmental_invalid":
-            accepted = "rerun"
+        if rerun_quality == "SUCCESS":
+            accepted = "rerun (SUCCESS)"
             rows.append(rerun_row)
             recovered_after_rerun_n.append(p["n"])
             print(f"  RECOVERED on rerun: V1={format_currency(rerun_row['v1_value'])} "
                   f"V2={format_currency(rerun_row['v2_value'])} "
                   f"({rerun_row['v2_confidence_label']}) [{rerun_row['elapsed_seconds']}s]", flush=True)
-        else:
-            # Still invalid after one rerun — do not retry again (per spec:
-            # rerun once). Keep the (still-invalid) rerun as the recorded
-            # row so this property is visibly a true failure requiring
-            # manual investigation, not silently dropped.
-            accepted = "rerun (still invalid — unresolved after one retry)"
+        elif rerun_quality in RERUN_TRIGGER_TIERS:
+            # Reproduced the same ambiguous/corrupt pattern on rerun.
+            # Reproducibility is evidence AGAINST random environmental
+            # corruption (which would not be expected to recur identically)
+            # — per the evidence-first principle, this is now classified
+            # GENUINE_FAILURE ("repeatable after rerun"), not left as an
+            # unresolved corruption suspicion.
+            accepted = f"rerun (reproduced {rerun_quality} — treated as GENUINE_FAILURE per repeatability)"
             rows.append(rerun_row)
             true_failures_n.append(p["n"])
-            print(f"  *** STILL INVALID after rerun [{rerun_row['elapsed_seconds']}s] — "
-                  f"true failure, needs manual investigation ***", flush=True)
+            print(f"  *** REPRODUCED on rerun [{rerun_row['elapsed_seconds']}s] — "
+                  f"repeatable, classified GENUINE_FAILURE, needs manual investigation ***", flush=True)
+        else:
+            # rerun_quality == "GENUINE_FAILURE" directly (e.g. errored, or
+            # took confirmed-genuine-length time and still found nothing).
+            accepted = "rerun (GENUINE_FAILURE confirmed)"
+            rows.append(rerun_row)
+            true_failures_n.append(p["n"])
+            print(f"  *** CONFIRMED GENUINE FAILURE on rerun [{rerun_row['elapsed_seconds']}s] ***", flush=True)
 
         rerun_manifest.append({
             "n": p["n"], "property": p["label"],
+            "first_pass_tier": quality,
+            "rerun_tier": rerun_quality,
             "reason_triggered": reason,
             "timestamp": datetime.now().isoformat(),
             "original_runtime_seconds": row["elapsed_seconds"],
@@ -594,7 +644,7 @@ def main():
     run_quality_stats = {
         "first_pass_success_count": n_first_pass_success,
         "first_pass_success_rate": round(n_first_pass_success / total_properties, 4) if total_properties else 0,
-        "environmental_invalid_flagged_count": n_flagged_invalid,
+        "flagged_for_rerun_count": n_flagged_invalid,  # CONFIRMED_ENVIRONMENTAL_INVALID + SUSPECT_ENVIRONMENTAL
         "rerun_recovered_count": n_recovered,
         "rerun_recovery_rate": round(n_recovered / n_flagged_invalid, 4) if n_flagged_invalid else None,
         "true_failure_count": n_true_failures,
@@ -621,14 +671,23 @@ def main():
         "true_failures_n": true_failures_n,
         "rerun_manifest": rerun_manifest,
         "note_on_run_quality_detection": (
-            "environmental_invalid runs (elapsed_seconds < "
-            f"{ENV_INVALID_ELAPSED_THRESHOLD_SECONDS}s with v1_value=v2_value=0 and no "
-            "exception) are automatically rerun once. The original invalid row is "
-            "never overwritten — see 'original_results_for_reruns' in this JSON's "
-            "top level for every preserved original. 'results' below contains only "
-            "the accepted row for every property (first-pass success, or the rerun "
-            "result if a rerun was triggered) — see 'rerun_manifest' for the full "
-            "per-property audit trail of what was flagged, why, and what was accepted."
+            "Every result is classified SUCCESS / CONFIRMED_ENVIRONMENTAL_INVALID / "
+            "SUSPECT_ENVIRONMENTAL / GENUINE_FAILURE (see _classify_run_quality() "
+            f"docstring). CONFIRMED_ENVIRONMENTAL_INVALID means elapsed_seconds == "
+            f"{CONFIRMED_CORRUPTION_ELAPSED_SECONDS}s exactly with v1=v2=0 and no "
+            "exception — the literal signature observed in every confirmed corruption "
+            f"incident. SUSPECT_ENVIRONMENTAL means v2 is empty with elapsed neither "
+            f"that exact value nor within the confirmed-genuine range (>= "
+            f"{GENUINE_FAILURE_MIN_OBSERVED_SECONDS}s) — an unusual pattern worth a "
+            "rerun but not yet proven corruption. Both tiers trigger one automatic "
+            "rerun; if the rerun reproduces the same tier, the property is recorded "
+            "as GENUINE_FAILURE (repeatable after rerun), since reproducibility "
+            "argues against random environmental corruption. The original flagged "
+            "row is never overwritten — see 'original_results_for_reruns' in this "
+            "JSON's top level for every preserved original. 'results' below contains "
+            "only the accepted row for every property — see 'rerun_manifest' for the "
+            "full per-property audit trail (first_pass_tier, rerun_tier, reason, "
+            "timestamps, runtimes, accepted result, whether outputs changed)."
         ),
         "note_on_valuation_date": (
             "Each property's comparable age (age_days) and HPI-adjusted prices "
@@ -644,8 +703,9 @@ def main():
 
     # --- Write JSON ---
     # "results" holds only accepted rows (one per property). Every original,
-    # rejected (environmental_invalid) row is preserved separately in
-    # "original_results_for_reruns" — never overwritten, never discarded.
+    # flagged (CONFIRMED_ENVIRONMENTAL_INVALID/SUSPECT_ENVIRONMENTAL) row is
+    # preserved separately in "original_results_for_reruns" — never
+    # overwritten, never discarded.
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump({
             "meta": meta,
@@ -686,14 +746,15 @@ def main():
         print(f"Rerun recovery rate:     {run_quality_stats['rerun_recovery_rate']:.1%} "
               f"({n_recovered} of {n_flagged_invalid} flagged runs recovered)", flush=True)
     else:
-        print("Rerun recovery rate:     n/a (no runs flagged environmental_invalid)", flush=True)
+        print("Rerun recovery rate:     n/a (no runs flagged CONFIRMED_ENVIRONMENTAL_INVALID/SUSPECT_ENVIRONMENTAL)", flush=True)
     print(f"True failure rate:       {run_quality_stats['true_failure_rate']:.1%}", flush=True)
     if rerun_manifest:
         print(flush=True)
         print("Rerun manifest:", flush=True)
         for entry in rerun_manifest:
-            print(f"  [{entry['n']}] {entry['property']}: {entry['original_runtime_seconds']}s -> "
-                  f"{entry['rerun_runtime_seconds']}s, accepted={entry['accepted_result']}, "
+            print(f"  [{entry['n']}] {entry['property']}: {entry['first_pass_tier']} "
+                  f"({entry['original_runtime_seconds']}s) -> {entry['rerun_tier']} "
+                  f"({entry['rerun_runtime_seconds']}s), accepted={entry['accepted_result']}, "
                   f"outputs_changed={entry['outputs_changed']}", flush=True)
     print(flush=True)
     print(f"CSV:  {csv_path}", flush=True)
