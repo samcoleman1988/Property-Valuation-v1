@@ -294,6 +294,66 @@ PROPERTIES = [
 GROUP_KEYS = ["Direct Evidence", "Development Evidence", "Local Market Evidence", "Area Market Evidence"]
 
 
+# --- Run-quality detection -------------------------------------------------
+#
+# Derived from direct observation of two confirmed environmental-corruption
+# incidents (Pipers Close, first expansion batch; properties #47-52, third
+# expansion batch — see validation_baselines/property_37_reruns/ and
+# validation_baselines/second_expansion_batch_reruns/). In every confirmed
+# case, elapsed_seconds was exactly 0.0 and v1_value/v2_value were both 0,
+# with no exception raised (error=None) and every per-group evidence_status
+# field populated identically to what a genuine "no evidence found" result
+# would show (e.g. "EMPTY", comp_count=0) — meaning the group-level fields
+# do NOT distinguish corruption from a genuine empty result; only elapsed
+# time does. Every confirmed GENUINE zero-evidence result observed so far
+# took at least several seconds (minimum observed: 4.8s, property #26
+# "Valley Park" in the 44-property run) — real API round-trips, even ones
+# that ultimately find nothing, take measurable time. The threshold below
+# sits with a wide margin below every genuine observation and a wide margin
+# above every corrupted observation; it is not an arbitrary "== 0.0" guess.
+ENV_INVALID_ELAPSED_THRESHOLD_SECONDS = 1.0
+
+
+def _classify_run_quality(row: dict) -> str:
+    """Classify a single run_one() result as one of:
+      "success"              — a real, usable valuation was produced.
+      "environmental_invalid" — matches the corruption signature: near-zero
+                                 elapsed time combined with zero valuation
+                                 output and no exception recorded. Almost
+                                 certainly a network-stack-not-ready or
+                                 machine-sleep artifact, not a genuine
+                                 finding about the property.
+      "genuine_failure"      — a real attempt was made (measurable elapsed
+                                 time) but no usable evidence/valuation
+                                 resulted, or an exception was caught.
+    Does not change or reinterpret any valuation field — read-only
+    classification of the harness's own output.
+    """
+    elapsed = row.get("elapsed_seconds")
+    v1 = row.get("v1_value") or 0
+    v2 = row.get("v2_value") or 0
+    has_error = bool(row.get("error"))
+
+    if has_error:
+        return "genuine_failure"
+
+    # V2 is the primary engine's output — a usable result means v2 > 0,
+    # matching credibility_judgement()'s own existing v2-keyed logic.
+    v2_empty = v2 in (0, None)
+    # The specific corruption signature observed in both confirmed
+    # incidents was BOTH engines returning zero simultaneously (they share
+    # the same empty comparable-evidence input) — used only to strengthen
+    # the environmental_invalid match, not to gate genuine_failure.
+    both_empty = v2_empty and (v1 in (0, None))
+    suspiciously_fast = elapsed is not None and elapsed < ENV_INVALID_ELAPSED_THRESHOLD_SECONDS
+
+    if both_empty and suspiciously_fast:
+        return "environmental_invalid"
+    if v2_empty:
+        return "genuine_failure"
+    return "success"
+
+
 def credibility_judgement(v2_value: float, asking: float, confidence_label: str) -> str:
     """Heuristic diagnostic computed by THIS SCRIPT for reporting only.
 
@@ -429,17 +489,76 @@ def main():
     print(f"Output: {csv_path}", flush=True)
     print(flush=True)
 
-    rows = []
+    rows = []                # accepted rows — what downstream consumers read
+    original_results_for_reruns = []  # preserved originals, never overwritten
+    rerun_manifest = []
+    successful_first_pass_n = []
+    recovered_after_rerun_n = []
+    true_failures_n = []
+
     for p in PROPERTIES:
         print(f"[{p['n']}/{len(PROPERTIES)}] {p['label']} ({p['postcode']})...", flush=True)
         row = run_one(p)
-        rows.append(row)
-        if row["error"]:
-            print(f"  *** ERROR: {row['error']} *** [{row['elapsed_seconds']}s]", flush=True)
+        quality = _classify_run_quality(row)
+
+        if quality != "environmental_invalid":
+            rows.append(row)
+            if quality == "success":
+                successful_first_pass_n.append(p["n"])
+            else:
+                true_failures_n.append(p["n"])
+            if row["error"]:
+                print(f"  *** ERROR: {row['error']} *** [{row['elapsed_seconds']}s]", flush=True)
+            else:
+                print(f"  V1={format_currency(row['v1_value'])} V2={format_currency(row['v2_value'])} "
+                      f"({row['v2_confidence_label']}) {row['credibility_judgement']} "
+                      f"[{row['elapsed_seconds']}s]", flush=True)
+            continue
+
+        # --- Environmentally invalid: rerun once immediately ---
+        reason = (
+            f"elapsed_seconds={row['elapsed_seconds']} (< {ENV_INVALID_ELAPSED_THRESHOLD_SECONDS}s) "
+            f"with v1_value={row['v1_value']}, v2_value={row['v2_value']}, error=None — "
+            f"matches the confirmed environmental-corruption signature, not a genuine result"
+        )
+        print(f"  *** FLAGGED environmental_invalid: {reason} — rerunning once ***", flush=True)
+        original_results_for_reruns.append(row)
+        rerun_row = run_one(p)
+        rerun_quality = _classify_run_quality(rerun_row)
+
+        outputs_changed = (
+            row.get("v1_value") != rerun_row.get("v1_value")
+            or row.get("v2_value") != rerun_row.get("v2_value")
+            or row.get("v2_confidence_label") != rerun_row.get("v2_confidence_label")
+        )
+
+        if rerun_quality != "environmental_invalid":
+            accepted = "rerun"
+            rows.append(rerun_row)
+            recovered_after_rerun_n.append(p["n"])
+            print(f"  RECOVERED on rerun: V1={format_currency(rerun_row['v1_value'])} "
+                  f"V2={format_currency(rerun_row['v2_value'])} "
+                  f"({rerun_row['v2_confidence_label']}) [{rerun_row['elapsed_seconds']}s]", flush=True)
         else:
-            print(f"  V1={format_currency(row['v1_value'])} V2={format_currency(row['v2_value'])} "
-                  f"({row['v2_confidence_label']}) {row['credibility_judgement']} "
-                  f"[{row['elapsed_seconds']}s]", flush=True)
+            # Still invalid after one rerun — do not retry again (per spec:
+            # rerun once). Keep the (still-invalid) rerun as the recorded
+            # row so this property is visibly a true failure requiring
+            # manual investigation, not silently dropped.
+            accepted = "rerun (still invalid — unresolved after one retry)"
+            rows.append(rerun_row)
+            true_failures_n.append(p["n"])
+            print(f"  *** STILL INVALID after rerun [{rerun_row['elapsed_seconds']}s] — "
+                  f"true failure, needs manual investigation ***", flush=True)
+
+        rerun_manifest.append({
+            "n": p["n"], "property": p["label"],
+            "reason_triggered": reason,
+            "timestamp": datetime.now().isoformat(),
+            "original_runtime_seconds": row["elapsed_seconds"],
+            "rerun_runtime_seconds": rerun_row["elapsed_seconds"],
+            "accepted_result": accepted,
+            "outputs_changed": outputs_changed,
+        })
 
     run_finished_at = datetime.now()
 
@@ -466,6 +585,22 @@ def main():
     elapsed_values = [r["elapsed_seconds"] for r in rows if r.get("elapsed_seconds") is not None]
     avg_runtime = round(sum(elapsed_values) / len(elapsed_values), 1) if elapsed_values else 0
 
+    # --- Run-quality statistics ---
+    total_properties = len(PROPERTIES)
+    n_first_pass_success = len(successful_first_pass_n)
+    n_flagged_invalid = len(rerun_manifest)
+    n_recovered = len(recovered_after_rerun_n)
+    n_true_failures = len(true_failures_n)
+    run_quality_stats = {
+        "first_pass_success_count": n_first_pass_success,
+        "first_pass_success_rate": round(n_first_pass_success / total_properties, 4) if total_properties else 0,
+        "environmental_invalid_flagged_count": n_flagged_invalid,
+        "rerun_recovered_count": n_recovered,
+        "rerun_recovery_rate": round(n_recovered / n_flagged_invalid, 4) if n_flagged_invalid else None,
+        "true_failure_count": n_true_failures,
+        "true_failure_rate": round(n_true_failures / total_properties, 4) if total_properties else 0,
+    }
+
     meta = {
         "model_version": MODEL_VERSION,
         "model_version_date": MODEL_VERSION_DATE,
@@ -480,6 +615,21 @@ def main():
         "credibility_judgement_totals": credibility_totals,
         "confidence_label_totals": confidence_totals,
         "average_runtime_seconds_per_property": avg_runtime,
+        "run_quality_stats": run_quality_stats,
+        "successful_first_pass_n": successful_first_pass_n,
+        "recovered_after_rerun_n": recovered_after_rerun_n,
+        "true_failures_n": true_failures_n,
+        "rerun_manifest": rerun_manifest,
+        "note_on_run_quality_detection": (
+            "environmental_invalid runs (elapsed_seconds < "
+            f"{ENV_INVALID_ELAPSED_THRESHOLD_SECONDS}s with v1_value=v2_value=0 and no "
+            "exception) are automatically rerun once. The original invalid row is "
+            "never overwritten — see 'original_results_for_reruns' in this JSON's "
+            "top level for every preserved original. 'results' below contains only "
+            "the accepted row for every property (first-pass success, or the rerun "
+            "result if a rerun was triggered) — see 'rerun_manifest' for the full "
+            "per-property audit trail of what was flagged, why, and what was accepted."
+        ),
         "note_on_valuation_date": (
             "Each property's comparable age (age_days) and HPI-adjusted prices "
             "are computed against datetime.now() inside comparable_engine.py at "
@@ -493,8 +643,15 @@ def main():
     }
 
     # --- Write JSON ---
+    # "results" holds only accepted rows (one per property). Every original,
+    # rejected (environmental_invalid) row is preserved separately in
+    # "original_results_for_reruns" — never overwritten, never discarded.
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump({"meta": meta, "results": rows}, f, indent=2, default=str)
+        json.dump({
+            "meta": meta,
+            "results": rows,
+            "original_results_for_reruns": original_results_for_reruns,
+        }, f, indent=2, default=str)
 
     # --- Write CSV ---
     fieldnames = list(rows[0].keys()) if rows else []
@@ -516,6 +673,29 @@ def main():
     print(f"Evidence status totals: {meta['evidence_status_totals']}", flush=True)
     print(f"Confidence totals:      {confidence_totals}", flush=True)
     print(f"Credibility totals:     {credibility_totals}", flush=True)
+    print(flush=True)
+    print("-" * 80, flush=True)
+    print("RUN QUALITY", flush=True)
+    print("-" * 80, flush=True)
+    print(f"Successful first-pass results ({n_first_pass_success}/{total_properties}): {successful_first_pass_n}", flush=True)
+    print(f"Recovered after automatic rerun ({n_recovered}/{n_flagged_invalid} flagged): {recovered_after_rerun_n}", flush=True)
+    print(f"True failures ({n_true_failures}/{total_properties}): {true_failures_n}", flush=True)
+    print(flush=True)
+    print(f"First-pass success rate: {run_quality_stats['first_pass_success_rate']:.1%}", flush=True)
+    if n_flagged_invalid:
+        print(f"Rerun recovery rate:     {run_quality_stats['rerun_recovery_rate']:.1%} "
+              f"({n_recovered} of {n_flagged_invalid} flagged runs recovered)", flush=True)
+    else:
+        print("Rerun recovery rate:     n/a (no runs flagged environmental_invalid)", flush=True)
+    print(f"True failure rate:       {run_quality_stats['true_failure_rate']:.1%}", flush=True)
+    if rerun_manifest:
+        print(flush=True)
+        print("Rerun manifest:", flush=True)
+        for entry in rerun_manifest:
+            print(f"  [{entry['n']}] {entry['property']}: {entry['original_runtime_seconds']}s -> "
+                  f"{entry['rerun_runtime_seconds']}s, accepted={entry['accepted_result']}, "
+                  f"outputs_changed={entry['outputs_changed']}", flush=True)
+    print(flush=True)
     print(f"CSV:  {csv_path}", flush=True)
     print(f"JSON: {json_path}", flush=True)
 
