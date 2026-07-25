@@ -363,9 +363,19 @@ same category — sleep/network-resume artefacts producing 0.0s/£0 results
 indistinguishable from a real property with no evidence (confirmed twice:
 Pipers Close in the first expansion batch, properties #47-52 in the
 third) — is now handled automatically. `validate_baseline.py` classifies
-every result as success/genuine_failure/environmental_invalid, auto-reruns
-flagged results once, and reports three sections (successful first-pass,
-recovered after rerun, true failures) with recovery-rate statistics. See
+every result as SUCCESS / CONFIRMED_ENVIRONMENTAL_INVALID / SUSPECT_ENVIRONMENTAL /
+GENUINE_FAILURE, auto-reruns the two non-SUCCESS-non-GENUINE_FAILURE tiers
+once, and — if a rerun reproduces the same ambiguous tier — classifies the
+property GENUINE_FAILURE ("repeatable after rerun") rather than leaving
+it as unresolved suspicion. The four-tier split (rather than an earlier
+three-tier version) exists because a live run flagged a property at 0.5s
+elapsed using a threshold band that was an engineering safety margin, not
+itself an observed corruption value — CONFIRMED_ENVIRONMENTAL_INVALID is
+now reserved strictly for the exact signature seen in both real incidents
+(elapsed_seconds == 0.0), with everything else empty-but-ambiguous routed
+through SUSPECT_ENVIRONMENTAL and resolved by reproducibility rather than
+a tuned constant. Reports three sections (successful first-pass, recovered
+after rerun, true failures) with recovery-rate statistics. See
 `test_run_quality_classifier.py`. This does not touch the `as_of_date`
 recency-boundary item above, which remains a separate, not-yet-implemented
 future task — the two are different reliability problems (wall-clock
