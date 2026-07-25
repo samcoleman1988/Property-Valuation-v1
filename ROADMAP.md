@@ -335,7 +335,7 @@ Covered by a new mocked test (`test_entity_count_schema_behaviour` in
 
 ---
 
-## Validation Harness Reproducibility (future item, not implemented)
+## Validation Harness Reproducibility
 
 **Finding**: re-running the same 44-property validation set a few days
 apart (unrelated to any code change) produced different `evidence_status`
@@ -357,6 +357,20 @@ path into whatever changed between the two runs in question.
 - Allow production runs (the live app) to default to the current date, as
   today — this only affects regression/validation reproducibility, not
   live behaviour.
+
+**Related, DONE (2026-07)**: a second, distinct reliability issue in this
+same category — sleep/network-resume artefacts producing 0.0s/£0 results
+indistinguishable from a real property with no evidence (confirmed twice:
+Pipers Close in the first expansion batch, properties #47-52 in the
+third) — is now handled automatically. `validate_baseline.py` classifies
+every result as success/genuine_failure/environmental_invalid, auto-reruns
+flagged results once, and reports three sections (successful first-pass,
+recovered after rerun, true failures) with recovery-rate statistics. See
+`test_run_quality_classifier.py`. This does not touch the `as_of_date`
+recency-boundary item above, which remains a separate, not-yet-implemented
+future task — the two are different reliability problems (wall-clock
+drift between runs vs. within-run environmental corruption) that happened
+to surface around the same time.
 
 ---
 
