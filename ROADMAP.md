@@ -15,7 +15,7 @@ record only.
 ## Implementation Order (agreed, final)
 
 1. ~~Outcome tracking infrastructure~~ — **Done.** `outcome_tracking` table + capture wired into app.py.
-2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 52/~100, pause LIFTED (2026-07-17).**
+2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 64/~100, pause LIFTED (2026-07-17).**
    - **Geocoding dedupe/batching — Done, committed (`68b614b`), pushed.** Fixed in `src/transport.py` (`geocode_postcodes_batch()`) and `src/comparable_engine.py`. Validated: 4-property cold-cache benchmark showed 3.4-6.6x speedup, 0 mismatches against sequential results, 100% warm-cache hit rate on re-run.
    - **Local Market property-type weighting — Done.** The systemic finding that paused this item (9/37 = 24% of properties affected by Local Market admitting mixed property types without discounting them, unlike Direct/Development) has been fixed, forensically validated (full per-group trace on two focus cases, 37/37 properties re-run before/after with zero unexplained movement), approved, and promoted as baseline `v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting`. See that baseline's `manifest.json` and `validation_baselines/forensic_reports/` for full detail. **Dataset expansion pause is lifted — resuming toward ~100.**
    - One finding from this investigation was deliberately *not* fixed and is carried forward as a new future item — see "Development Evidence Robustness" below.
@@ -154,7 +154,7 @@ records human judgement about why.
 
 ---
 
-## 2. Expand Validation Dataset (~100 properties) — IN PROGRESS: 52/~100
+## 2. Expand Validation Dataset (~100 properties) — IN PROGRESS: 64/~100
 
 Grow the fixed set in `validate_baseline.py` from 20 to roughly 100
 properties, stratified across property type, region, and evidence-status mix
