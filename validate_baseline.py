@@ -354,6 +354,40 @@ PROPERTIES = [
      "url": "https://www.rightmove.co.uk/properties/174295046",
      "why_selected": "Unusually high bedroom count (8) for a semi-detached house — likely a large converted/HMO-style property.",
      "expected_challenge": "Unusual layout — 8-bed semi is atypical, likely a converted or multi-unit property; tests engine behaviour on an outlier bedroom count."},
+
+    # --- Fifth expansion batch (ROADMAP.md item 2, resumed 2026-07-26),
+    # sourced live from Rightmove — new regional cluster (East Midlands,
+    # first Nottingham entries). Smaller batch than usual: Nottingham's
+    # Rightmove listings hide full postcodes unusually often, and no
+    # maisonette candidate with a full postcode was found despite a
+    # dedicated search (Nottingham, then Portsmouth) — that gap remains
+    # open. Adds confirmed-leasehold coverage and several genuine HMO/
+    # unusual-layout properties (Lenton student housing area).
+    {"n": 65, "label": "Ayr Street, Nottingham", "postcode": "NG7 4HB",
+     "type": "Terraced", "beds": 6, "tenure": "", "asking": 525000, "street": "Ayr Street",
+     "url": "https://www.rightmove.co.uk/properties/170089913",
+     "why_selected": "Genuinely new UK region (East Midlands, first Nottingham entry) — listed as a fully-let licensed HMO investment.",
+     "expected_challenge": "HMO/student-let property; 6-bed terrace is atypical for the type, likely converted; new region with no existing comparable-region coverage."},
+    {"n": 66, "label": "Castle Boulevard, Nottingham", "postcode": "NG7 1FE",
+     "type": "Terraced", "beds": 7, "tenure": "", "asking": 450000, "street": "Castle Boulevard",
+     "url": "https://www.rightmove.co.uk/properties/166042214",
+     "why_selected": "Nottingham cluster densification — another confirmed licensed HMO (7-bed).",
+     "expected_challenge": "HMO/unusual layout; tests whether the engine's comparable pool correctly separates HMO-converted terraces from standard family terraces in the same area."},
+    {"n": 67, "label": "Beeston Road, Dunkirk, Nottingham", "postcode": "NG7 2JS",
+     "type": "Terraced", "beds": 5, "tenure": "", "asking": 435000, "street": "Beeston Road",
+     "url": "https://www.rightmove.co.uk/properties/169573397",
+     "why_selected": "Nottingham cluster densification, Dunkirk/university area — another student HMO.",
+     "expected_challenge": "Student HMO; university-adjacent sub-area within the wider Nottingham cluster."},
+    {"n": 68, "label": "Balfour Road, Lenton, Nottingham", "postcode": "NG7 1NZ",
+     "type": "Terraced", "beds": 6, "tenure": "", "asking": 435000, "street": "Balfour Road",
+     "url": "https://www.rightmove.co.uk/properties/167770250",
+     "why_selected": "Fourth Nottingham HMO in the 'Lenton Triangle' student area — strong same-area comparable density test alongside #65-67.",
+     "expected_challenge": "Dense HMO sub-market (Lenton Triangle); tests estate/local-area evidence density for a genuinely different property archetype (student HMO) than anything else in the dataset."},
+    {"n": 69, "label": "One Fletcher Gate, Nottingham", "postcode": "NG1 1QR",
+     "type": "Flat", "beds": 4, "tenure": "Leasehold", "asking": 594000, "street": "Fletcher Gate",
+     "url": "https://www.rightmove.co.uk/properties/91301082",
+     "why_selected": "CONFIRMED leasehold penthouse (124 years remaining from 2004, verified on listing page) — further closes the confirmed-leasehold coverage gap. City-centre Nottingham double penthouse.",
+     "expected_challenge": "Confirmed leasehold flat; large 4-bed penthouse is atypical for a city-centre flat, comparables may be sparse."},
 ]
 
 GROUP_KEYS = ["Direct Evidence", "Development Evidence", "Local Market Evidence", "Area Market Evidence"]
