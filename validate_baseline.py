@@ -388,6 +388,20 @@ PROPERTIES = [
      "url": "https://www.rightmove.co.uk/properties/91301082",
      "why_selected": "CONFIRMED leasehold penthouse (124 years remaining from 2004, verified on listing page) — further closes the confirmed-leasehold coverage gap. City-centre Nottingham double penthouse.",
      "expected_challenge": "Confirmed leasehold flat; large 4-bed penthouse is atypical for a city-centre flat, comparables may be sparse."},
+
+    # --- Sixth expansion batch (ROADMAP.md item 2, resumed 2026-07-27) ---
+    # Sourcing this round hit a genuine, structural obstacle: across six
+    # regions tried (Nottingham, Portsmouth, Lewisham, Croydon, Leeds —
+    # see session history), Rightmove increasingly does not expose full
+    # postcodes, even on individual listing pages, not just search
+    # results. Only one property survived full-postcode verification this
+    # round. Rather than force further low-yield searching, this batch is
+    # deliberately small and the limitation is reported plainly.
+    {"n": 70, "label": "Camille House, Beulah Hill, Crystal Palace", "postcode": "SE19 3LQ",
+     "type": "Detached House", "beds": 5, "tenure": "", "asking": 2000000, "street": "Beulah Hill",
+     "url": "https://www.rightmove.co.uk/properties/90179724",
+     "why_selected": "Genuinely new UK region (Greater London, first London entry) — premium Crystal Palace detached house.",
+     "expected_challenge": "London price tier and market with no existing comparable-region coverage in this dataset; premium price point may mean sparse comparables."},
 ]
 
 GROUP_KEYS = ["Direct Evidence", "Development Evidence", "Local Market Evidence", "Area Market Evidence"]
