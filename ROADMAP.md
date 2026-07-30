@@ -15,7 +15,7 @@ record only.
 ## Implementation Order (agreed, final)
 
 1. ~~Outcome tracking infrastructure~~ — **Done.** `outcome_tracking` table + capture wired into app.py.
-2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 69/~100, pause LIFTED (2026-07-17).**
+2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 70/~100, pause LIFTED (2026-07-17).**
    - **Geocoding dedupe/batching — Done, committed (`68b614b`), pushed.** Fixed in `src/transport.py` (`geocode_postcodes_batch()`) and `src/comparable_engine.py`. Validated: 4-property cold-cache benchmark showed 3.4-6.6x speedup, 0 mismatches against sequential results, 100% warm-cache hit rate on re-run.
    - **Local Market property-type weighting — Done.** The systemic finding that paused this item (9/37 = 24% of properties affected by Local Market admitting mixed property types without discounting them, unlike Direct/Development) has been fixed, forensically validated (full per-group trace on two focus cases, 37/37 properties re-run before/after with zero unexplained movement), approved, and promoted as baseline `v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting`. See that baseline's `manifest.json` and `validation_baselines/forensic_reports/` for full detail. **Dataset expansion pause is lifted — resuming toward ~100.**
    - One finding from this investigation was deliberately *not* fixed and is carried forward as a new future item — see "Development Evidence Robustness" below.
@@ -154,7 +154,7 @@ records human judgement about why.
 
 ---
 
-## 2. Expand Validation Dataset (~100 properties) — IN PROGRESS: 69/~100
+## 2. Expand Validation Dataset (~100 properties) — IN PROGRESS: 70/~100
 
 Grow the fixed set in `validate_baseline.py` from 20 to roughly 100
 properties, stratified across property type, region, and evidence-status mix
@@ -184,6 +184,22 @@ beyond what's fallen out incidentally, and the three new regions added are
 each represented by only 1-4 properties — not yet enough per-region density
 to be a robust regional cross-check on their own. The bulk of the dataset
 (37 of 44) remains on the original Oxfordshire + North West axis.
+
+**Status update (batches 3-6, through 2026-07-30): dataset now at 70/~100.**
+Added West Midlands/Birmingham (12 properties), East Midlands/Nottingham (5,
+including licensed student HMOs — a new archetype), one Greater London entry
+(Crystal Palace), and deepened Bristol further. Bungalows now well covered
+(9). Confirmed-leasehold flats up to ~10/70. **Maisonettes remain a
+confirmed, persistent gap** — searched across six separate regions
+(Bristol, Nottingham, Portsmouth, Lewisham, Croydon, Leeds) with zero
+usable candidates found, not for lack of maisonette listings but because
+Rightmove increasingly withholds full postcodes on many listings, including
+on individual listing pages, not just search results — confirmed via direct
+per-listing fetches each time, not assumed after one failed attempt. Future
+sessions should not keep re-attempting the same search-and-hope approach
+across new cities; likely needs either a different sourcing method (e.g.
+the user supplying specific known maisonette listings directly) or accepting
+this as a real, documented dataset limitation rather than a solvable gap.
 
 **Property #37 (Pipers Close, Heswall, CH60 7RE)** was flagged untrustworthy
 in the original run (0.0s elapsed, V1=V2=£0, likely a network-resume
