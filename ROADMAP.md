@@ -15,7 +15,7 @@ record only.
 ## Implementation Order (agreed, final)
 
 1. ~~Outcome tracking infrastructure~~ — **Done.** `outcome_tracking` table + capture wired into app.py.
-2. **Expand validation dataset (target ~100 properties) — IN PROGRESS: 70/~100, pause LIFTED (2026-07-17).**
+2. **Expand validation dataset — 70/~78-82 (revised target, see coverage matrix review 2026-07-30), pause LIFTED (2026-07-17).**
    - **Geocoding dedupe/batching — Done, committed (`68b614b`), pushed.** Fixed in `src/transport.py` (`geocode_postcodes_batch()`) and `src/comparable_engine.py`. Validated: 4-property cold-cache benchmark showed 3.4-6.6x speedup, 0 mismatches against sequential results, 100% warm-cache hit rate on re-run.
    - **Local Market property-type weighting — Done.** The systemic finding that paused this item (9/37 = 24% of properties affected by Local Market admitting mixed property types without discounting them, unlike Direct/Development) has been fixed, forensically validated (full per-group trace on two focus cases, 37/37 properties re-run before/after with zero unexplained movement), approved, and promoted as baseline `v2-evidence-status-fallback-guard-real-hpi-cr1-h0-lm-type-weighting`. See that baseline's `manifest.json` and `validation_baselines/forensic_reports/` for full detail. **Dataset expansion pause is lifted — resuming toward ~100.**
    - One finding from this investigation was deliberately *not* fixed and is carried forward as a new future item — see "Development Evidence Robustness" below.
@@ -154,9 +154,45 @@ records human judgement about why.
 
 ---
 
-## 2. Expand Validation Dataset (~100 properties) — IN PROGRESS: 70/~100
+## 2. Expand Validation Dataset — REVISED TARGET: ~78-82, not 100 (2026-07-30)
 
-Grow the fixed set in `validate_baseline.py` from 20 to roughly 100
+**Coverage matrix review completed** (2026-07-30): see
+`validation_baselines/forensic_reports/coverage_matrix_2026-07-30.md` for
+the full analysis. Acquisition cost per property has risen sharply
+(confirmed empirically — the last batch required searching 6 separate
+cities for one usable property) while expected new-insight value per
+property is falling as the type/tenure/evidence-profile space fills in.
+The success criterion is no longer "reach 100" but "reach sufficient
+coverage that additional properties are unlikely to reveal new systematic
+valuation behaviour" — the coverage matrix indicates this point is closer
+to 78-82 properties than 100, provided the remaining high-value targeted
+gaps are filled (see below), not through continued broad regional sourcing.
+
+**Confirmed via direct data analysis, not assumption**: every Detached
+property in the dataset (6/6) has abundant local market evidence
+(55-444 comps) — zero genuinely sparse-evidence Detached case exists.
+Every Leasehold subject but one lands in a STRONG local market — no
+genuine tenure-conflict scenario has been tested. These two gaps rank
+above maisonettes (confirmed lower value — `normalise_property_type()`
+maps flat/apartment/maisonette to the identical Land Registry code,
+so a maisonette would exercise the same code path as the 18 flats
+already tested) and above further regional spread (the engine has no
+region-specific branching logic at all — HPI region and Land Registry
+queries are region-agnostic, so new regions mostly test external data
+density, not engine logic).
+
+**Recommended remaining sourcing**: a small, targeted batch (~8-12
+properties) addressing sparse-evidence Detached and genuine
+tenure-conflict cases specifically — via user-supplied known properties
+rather than continued blind city-by-city Rightmove search, which has
+confirmed steeply diminishing returns. Land Registry direct sourcing
+(scriptable, deterministic, dual-purpose with the outcome-tracking/
+calibration item below) is the recommended approach for any further
+volume needed for calibration work specifically, once real outcome data
+accumulates — a different goal from structural coverage.
+
+Original framing retained below for historical context — grow the fixed
+set in `validate_baseline.py` from 20 to roughly 100
 properties, stratified across property type, region, and evidence-status mix
 (deliberately including some properties that land in WEAK/FALLBACK_ONLY
 territory, not just STRONG) — 20 is enough to catch gross regressions but too
